@@ -1,0 +1,19 @@
+# Réglages accélérés du laboratoire uniquement. Ne pas utiliser tels quels au QG.
+[features]
+trombi = false
+moderation = false
+
+[rules]
+message_cooldown = 5
+words_cooldown = 1
+counting_reward_every = 3
+counting_failure_seconds = 30
+goblin_seconds = 30
+goblin_min_players = 1
+goblin_max_players = 20
+goblin_reward = 100
+goblin_interval_minutes = 0
+jackpot_seconds = 30
+
+[words]
+mode = "free"

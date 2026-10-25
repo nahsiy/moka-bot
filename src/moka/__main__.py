@@ -75,6 +75,13 @@ def main(argv=None):
     sub.add_parser("check", help="Valider configuration et commandes sans connexion Discord")
     sub.add_parser("demo", help="Jouer un scénario local sans token, sans données réelles")
     sub.add_parser("run", help="Démarrer le bot (token et serveurs autorisés requis)")
+    laboratory = sub.add_parser(
+        "prepare-test",
+        help="Préparer les salons/rôles dans le seul serveur Moka • Laboratoire autorisé",
+    )
+    laboratory.add_argument(
+        "--expected-name", default="Moka • Laboratoire", help="Nom exact du serveur de test attendu"
+    )
     backup = sub.add_parser("backup", help="Créer une sauvegarde cohérente sans écraser un fichier")
     backup.add_argument("destination", type=Path)
     args = parser.parse_args(argv)
@@ -110,6 +117,17 @@ def main(argv=None):
         token = os.getenv("DISCORD_TOKEN", "").strip()
         if not token:
             raise ValueError("Définis DISCORD_TOKEN dans l'environnement")
+        if args.command == "prepare-test":
+            from moka.laboratory import run
+
+            print(
+                json.dumps(
+                    asyncio.run(run(config, token, expected_name=args.expected_name)),
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            )
+            return 0
         # Une instance par base : évite les doublons d'événements Discord.
         import fcntl
 
