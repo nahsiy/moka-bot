@@ -20,6 +20,11 @@ de test dédié, avec un seul compte humain. La recette complète reste à termi
 - Démonstration CLI dans une vraie base SQLite jetable, avec contrôle d'intégrité
   et sauvegarde cohérente. Pas de faux résultat réseau.
 - Lint Ruff et formatage passent ; lockfile cohérent.
+- Dépôt public publié sous `nahsiy/moka-bot`. Le premier workflow
+  [GitHub Actions](https://github.com/nahsiy/moka-bot/actions/runs/40228508445)
+  réussit sous Python 3.12 et 3.13 : installation verrouillée, lint, formatage,
+  tests, vérification des commandes et démonstration CLI. Il ne se connecte pas
+  à Discord.
 
 Un avertissement de dépréciation `audioop` provient de discord.py sous Python
 3.12. Aucun audio n'est capturé ou lu par ce projet.
@@ -63,8 +68,6 @@ dans le QG n'a été effectué.
   timeouts, banque, transferts et autres jeux en conditions réelles.
 - XP vocal : adaptateur écrit, recette à deux humains nécessaire.
 - Build/exécution Docker : moteur local arrêté, `docker info` a échoué.
-- Workflow GitHub Actions : fichier préparé, pas de dépôt distant ni de run CI.
-- Python 3.13 : prévu par la matrice CI, pas testé dans cette livraison locale.
 - Anciennes règles précises, équilibrage, catalogue et fonctionnalités cachées
   de Sylhbot. Pas d'affirmation de parité complète à ce stade.
 
