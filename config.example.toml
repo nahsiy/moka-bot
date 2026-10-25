@@ -1,0 +1,57 @@
+# Les identifiants Discord vont ici ou se définissent avec /config.
+# Le token et les serveurs autorisés restent dans .env (jamais dans Git).
+
+[features]
+xp = true
+economy = true
+bank = true
+bet = true
+jackpot = true
+robbery = true
+hack = true
+goblin = true
+counting = true
+words = true
+fun = true
+horoscope = true
+shop = true
+roles = true
+tickets = true
+temporary_voice = true
+# À activer après réglage des rôles, permissions et salons sur le serveur test.
+trombi = false
+moderation = false
+
+[rules]
+message_cooldown = 60
+message_xp = 15
+message_coins = 3
+voice_xp = 10
+voice_coins = 2
+daily_coins = 200
+weekly_coins = 1500
+bank_capacity = 1000
+bank_interest_bps = 100
+bank_interest_max_bps = 500
+counting_failure_seconds = 10800
+goblin_seconds = 60
+goblin_min_players = 3
+goblin_max_players = 20
+goblin_reward = 100
+# 0 : pas de publication automatique. Essayer d'abord /animation lancer.
+goblin_interval_minutes = 0
+jackpot_ticket_cost = 100
+jackpot_seconds = 300
+trombi_min_level = 50
+
+[words]
+# Règles de l'ancien salon non vérifiées. Proposition explicite, configurable.
+# free : association libre ; last_letter : enchaînement par dernière lettre.
+mode = "free"
+
+[channels]
+# counting = 123456789012345678
+# words = 123456789012345679
+
+[roles]
+# counting_failure = 123456789012345680

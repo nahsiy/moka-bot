@@ -1,0 +1,31 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "moka-community-bot"
+version = "0.1.0"
+description = "Un compagnon Discord modulaire pour les communautés francophones."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = ["discord.py>=2.6,<3"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<10", "pytest-asyncio>=0.25,<2", "ruff>=0.11,<1"]
+
+[project.scripts]
+moka = "moka.__main__:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/moka"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["E501"]
