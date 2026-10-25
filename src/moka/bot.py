@@ -265,7 +265,7 @@ class MokaBot(commands.Bot):
             if guild.id not in self.config.guild_ids or not self.service.is_enabled(guild.id, "xp"):
                 continue
             for channel in [*guild.voice_channels, *guild.stage_channels]:
-                if channel.id == guild.afk_channel_id:
+                if channel == guild.afk_channel:
                     continue
                 eligible = [
                     m

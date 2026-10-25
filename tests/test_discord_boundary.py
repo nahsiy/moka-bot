@@ -191,6 +191,34 @@ async def test_configurable_no_global_sync_by_default(service):
     await bot.close()
 
 
+async def test_voice_tick_with_real_discord_guild(service):
+    bot = MokaBot(service.config, service=service)
+    guild = discord.Guild(
+        data={"id": "1", "name": "Laboratoire", "roles": [], "afk_channel_id": "5"},
+        state=bot._connection,
+    )
+    channel = discord.VoiceChannel(
+        state=bot._connection,
+        guild=guild,
+        data={
+            "id": "5",
+            "name": "AFK",
+            "type": 2,
+            "permission_overwrites": [],
+            "position": 0,
+            "bitrate": 64000,
+            "user_limit": 0,
+        },
+    )
+    guild._channels[channel.id] = channel
+    bot._connection._guilds[guild.id] = guild
+    bot.is_ready = lambda: True
+    await MokaBot.voice_rewards.coro(bot)
+    assert bot.voice_eligible == set()
+    assert bot.last_voice_tick is not None
+    await bot.close()
+
+
 def test_demo_is_offline_and_real_sqlite():
     result = demo()
     assert not result["discord_connected"]
