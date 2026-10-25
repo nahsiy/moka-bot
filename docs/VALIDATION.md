@@ -50,8 +50,10 @@ de discord.py. Le suivi vocal utilise désormais la propriété publique
 l'exception avant correction et passe après celle-ci.
 
 Le bot tourne localement sur le Mac avec `.env` et `config.test.toml` ; ce n'est
-pas encore un hébergement permanent. Les données, logs et captures de recette
-ne sont pas versionnés. Aucun déploiement dans le QG ni publication GitHub.
+pas encore un hébergement permanent. Les données et logs ne sont pas versionnés.
+Deux captures du laboratoire personnel sont sélectionnées dans la
+[présentation publique](../README.md#voir-moka-dans-discord). Aucun déploiement
+dans le QG n'a été effectué.
 
 ## Non vérifié ou non exécuté
 
@@ -87,5 +89,6 @@ ne sont pas versionnés. Aucun déploiement dans le QG ni publication GitHub.
 | Droits Discord retirés en cours d'événement | Erreur visible/loggée ; pas de second paiement au retour des droits |
 | Deux bots dans le serveur | Désactiver les modules qui feraient doublon avec DraftBot |
 
-Les captures GitHub devront être réalisées après cette recette et être
-présentées avec des comptes et données de démonstration consentis.
+Les captures publiques montrent les essais explicitement vérifiés ci-dessus,
+avec le compte du testeur et le bot. Elles ne montrent aucun échange de membres
+du serveur cible et ne prouvent pas l'exécution de toute la recette restante.

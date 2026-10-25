@@ -4,9 +4,35 @@ Un compagnon Discord francophone : discussions, progression et petites
 animations pour faire vivre une communauté. Python 3.12+, SQLite, modules
 activables séparément. Aucun service payant ni modèle IA requis.
 
-**Version 0.1.0 : prototype fonctionnel validé localement.** Pas encore connecté
-à un serveur Discord. Les permissions, le rendu et les parcours réels restent à
-vérifier sur un serveur de test. Ce dépôt n'a pas encore été publié sur GitHub.
+**Version 0.1.0 : prototype avec une première démo réelle dans Discord et
+61 tests locaux réussis.** Aide, récompense quotidienne, profil, rôle à choisir,
+création de ticket, counting, suite de mots et gobelin après redémarrage ont été
+essayés sur un serveur dédié. L'XP vocal à deux personnes et les autres parcours
+restent à valider : [détail des vérifications](docs/VALIDATION.md).
+
+Moka peut servir de base commune : code Python modifiable, licence MIT et
+hébergement au choix de l'équipe. Chaque module peut être activé séparément,
+notamment pour conserver les fonctions déjà assurées par un autre bot.
+
+## Voir Moka dans Discord
+
+Captures réelles du laboratoire personnel, le 25 octobre 2026. Elles montrent
+le compte du testeur et le bot ; aucun échange de membres du serveur cible.
+Cliquer sur une image permet de la lire en grand.
+
+![Profil, menu de rôles, ticket et gobelin dans le serveur de test](docs/images/discord-demo.png)
+
+Le bouton du gobelin a survécu à un redémarrage. Une deuxième participation a
+été refusée et une seule récompense de 100 cœurs a été versée.
+
+![Counting : nombre valide, erreur et retour à 1](docs/images/discord-counting.png)
+
+Le rôle de pénalité a été attribué puis retiré à échéance. Le laboratoire utilise
+un délai de 30 secondes ; la configuration par défaut prévoit trois heures.
+
+Un [parcours de démonstration de cinq minutes](docs/DEMO.md) permet de présenter
+le bot au staff. Une démonstration locale sans compte Discord est aussi disponible
+ci-dessous.
 
 ## Ce qui est développé
 
@@ -94,5 +120,6 @@ aucun dashboard web, port entrant, Redis ou PostgreSQL n'est nécessaire.
 - [Discord : équipes de développement](https://docs.discord.com/developers/topics/teams)
 - [uv dans Docker](https://docs.astral.sh/uv/guides/integration/docker/)
 
-Les captures de présentation seront produites avec le vrai bot sur le serveur
-de test. Aucun faux screenshot Discord n'est fourni comme preuve de fonctionnement.
+Les captures ci-dessus proviennent du vrai client Discord. Le scénario CLI est
+une démonstration hors ligne séparée ; il ne prouve pas le fonctionnement de
+tous les modules dans Discord.
