@@ -5,9 +5,29 @@ import sqlite3
 import uuid
 
 from moka.base import BaseService, DomainError, level
+from moka.social_catalog import SOCIAL_CATALOG
 
 
 class Community(BaseService):
+    def social_message(self, guild, user, key, kind):
+        if kind not in SOCIAL_CATALOG:
+            raise DomainError("Choisis un compliment ou une taquinerie.")
+
+        def run(con):
+            self.cooldown(con, guild, user, "fun", 15)
+            catalog = SOCIAL_CATALOG[kind]
+            setting_key = "fun:recent:" + kind
+            recent = self.setting(con, guild, setting_key, [])
+            recent = [line for line in recent if line in catalog][-5:]
+            text = self.rng.choice([line for line in catalog if line not in recent])
+            con.execute(
+                "INSERT INTO settings VALUES(?,?,?) ON CONFLICT(guild,key) DO UPDATE SET value=excluded.value",
+                (guild, setting_key, json.dumps((recent + [text])[-5:])),
+            )
+            return {"text": text, "kind": kind}
+
+        return self.perform(guild, user, "fun", key, ["fun"], run)
+
     def reserve_ticket(self, guild, user, key):
         def run(con):
             existing = con.execute(

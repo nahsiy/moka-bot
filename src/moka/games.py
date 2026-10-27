@@ -6,6 +6,7 @@ import unicodedata
 import uuid
 
 from moka.base import BaseService, DomainError
+from moka.counting_expression import evaluate_expression
 
 
 def normalize_word(text):
@@ -17,11 +18,61 @@ def letters(text):
 
 
 class Games(BaseService):
+    def _game_penalty(self, con, guild, user):
+        grant = con.execute(
+            "SELECT * FROM role_grants WHERE guild=? AND user=? AND reason IN ('counting','words') AND until>? ORDER BY until DESC LIMIT 1",
+            (guild, user, self.clock()),
+        ).fetchone()
+        if not grant:
+            return None
+        return {"penalty_until": grant["until"], "penalty_role": grant["role"]}
+
+    def game_penalty(self, guild, user):
+        self.allowed(guild)
+        with self.store.read() as con:
+            return self._game_penalty(con, guild, user)
+
+    def release_game_penalty(self, guild, user, key):
+        def run(con):
+            now = self.clock()
+            roles = {
+                row["role"]
+                for row in con.execute(
+                    "SELECT role FROM role_grants WHERE guild=? AND user=? AND reason IN ('counting','words')",
+                    (guild, user),
+                )
+            }
+            configured = self.setting(
+                con, guild, "role:counting_failure", self.config.roles.get("counting_failure")
+            )
+            if configured:
+                roles.add(configured)
+            for role in roles:
+                # Une échéance passée laisse la maintenance réessayer un retrait Discord échoué.
+                con.execute(
+                    "INSERT INTO role_grants(guild,user,role,reason,until) VALUES(?,?,?,'counting',?) ON CONFLICT(guild,user,role) DO UPDATE SET until=MIN(role_grants.until,excluded.until) WHERE role_grants.reason IN ('counting','words')",
+                    (guild, user, role, now),
+                )
+            return {"roles": sorted(roles), "released_at": now}
+
+        return self.perform(guild, user, "release-game-penalty", f"unpause:{key}", [], run)
+
+    def _penalize_game_error(self, con, guild, user, game):
+        role = self.setting(
+            con, guild, "role:counting_failure", self.config.roles.get("counting_failure")
+        )
+        seconds = self.config.rules.counting_failure_seconds
+        if not role or not seconds:
+            return {}
+        until = self.clock() + seconds
+        con.execute(
+            "INSERT INTO role_grants(guild,user,role,reason,until) VALUES(?,?,?,?,?) ON CONFLICT(guild,user,role) DO UPDATE SET reason=excluded.reason,until=excluded.until,applied=0",
+            (guild, user, role, game, until),
+        )
+        return {"penalty_until": until, "penalty_role": role}
+
     def counting(self, guild, channel, user, content, message):
-        text = content.strip()
-        if not re.fullmatch(r"[0-9]{1,12}", text):
-            return {"ignored": True}
-        number = int(text)
+        number = evaluate_expression(content)
 
         def run(con):
             con.execute(
@@ -36,44 +87,73 @@ class Games(BaseService):
             )
             if message <= state["last_message"]:
                 return {"ignored": True}
+            if penalty := self._game_penalty(con, guild, user):
+                return {"blocked": True, **penalty}
             expected = state["score"] + 1
-            valid = number == expected and user != state["last_user"]
-            score = number if valid else 0
+            reason = (
+                "expression"
+                if number is None
+                else "not_integer"
+                if number.denominator != 1
+                else "same_user"
+                if user == state["last_user"]
+                else "number"
+                if number != expected
+                else None
+            )
+            valid = reason is None
+            restart = not valid and self.rng.random() < 0.5
+            score = expected if valid else 0 if restart else state["score"]
             con.execute(
                 "UPDATE games SET score=?, record=MAX(record,?), last_user=?, last_message=? WHERE guild=? AND channel=? AND kind='counting'",
                 (score, score, user if valid else 0, message, guild, channel),
             )
-            reward = 0
-            if (
-                valid
-                and score % self.config.rules.counting_reward_every == 0
-                and self.setting(con, guild, "feature:economy", self.config.features["economy"])
-            ):
-                reward = self.config.rules.counting_reward
-                self.money(con, guild, user, wallet=reward, reason="counting")
-            role = self.setting(
-                con, guild, "role:counting_failure", self.config.roles.get("counting_failure")
-            )
-            if not valid and role:
-                con.execute(
-                    "INSERT INTO role_grants(guild,user,role,reason,until) VALUES(?,?,?,'counting',?) ON CONFLICT(guild,user,role) DO UPDATE SET until=excluded.until",
-                    (guild, user, role, self.clock() + self.config.rules.counting_failure_seconds),
+            reward = fine = 0
+            economy = self.setting(con, guild, "feature:economy", self.config.features["economy"])
+            if valid and score % self.config.rules.counting_reward_every == 0 and economy:
+                reward = self.credit_prize(
+                    con, guild, user, self.config.rules.counting_reward, "counting"
                 )
+            configured_fine = self.setting(
+                con, guild, "counting:fine", self.config.rules.counting_fine
+            )
+            if not valid and economy:
+                fine = min(configured_fine, self.account(con, guild, user)["wallet"])
+                if fine:
+                    self.money(con, guild, user, wallet=-fine, reason="counting-fine")
+            penalty = self._penalize_game_error(con, guild, user, "counting") if not valid else {}
             return {
                 "valid": valid,
                 "score": score,
                 "expected": expected,
                 "reward": reward,
                 "record": max(state["record"], score),
-                "reason": "same_user" if user == state["last_user"] else "number",
+                "reason": reason,
+                "fine": fine,
+                "configured_fine": configured_fine,
+                "economy": bool(economy),
+                "restart": restart,
+                "next": score + 1,
+                **penalty,
             }
 
         return self.perform(guild, user, "counting", f"count:{message}", ["counting"], run)
 
+    def counting_status(self, guild, channel):
+        self.allowed(guild)
+        with self.store.read() as con:
+            row = con.execute(
+                "SELECT score,record FROM games WHERE guild=? AND channel=? AND kind='counting'",
+                (guild, channel),
+            ).fetchone()
+            return {
+                "next": row["score"] + 1 if row else 1,
+                "record": row["record"] if row else 0,
+                "fine": self.setting(con, guild, "counting:fine", self.config.rules.counting_fine),
+            }
+
     def word(self, guild, channel, user, content, message):
         word = normalize_word(content)
-        if len(word) > 40 or not re.fullmatch(r"[^\W\d_]+(?:[-’'][^\W\d_]+)*", word):
-            return {"ignored": True}
 
         def run(con):
             con.execute(
@@ -88,20 +168,32 @@ class Games(BaseService):
             )
             if message <= state["last_message"]:
                 return {"ignored": True}
-            if state["last_user"] == user:
-                raise DomainError("Laisse un autre membre proposer le prochain mot.")
-            if con.execute(
+            if penalty := self._game_penalty(con, guild, user):
+                return {"blocked": True, **penalty}
+            error = None
+            mode = self.setting(con, guild, "words:mode", self.config.word_mode)
+            if len(word) > 40 or not re.fullmatch(r"[^\W\d_]+(?:[-’'][^\W\d_]+)*", word):
+                error = "Propose un seul mot, sans chiffre ni phrase."
+            elif state["last_user"] == user:
+                error = "Laisse un autre membre proposer le prochain mot."
+            elif con.execute(
                 "SELECT 1 FROM words WHERE guild=? AND channel=? AND round=? AND word=?",
                 (guild, channel, state["round"], word),
             ).fetchone():
-                raise DomainError("Ce mot a déjà été proposé pendant cette partie.")
-            mode = self.setting(con, guild, "words:mode", self.config.word_mode)
-            if (
+                error = "Ce mot a déjà été proposé pendant cette partie."
+            elif (
                 mode == "last_letter"
                 and state["value"]
                 and letters(state["value"])[-1] != letters(word)[0]
             ):
-                raise DomainError(f"Le mot doit commencer par « {letters(state['value'])[-1]} ».")
+                error = f"Le mot doit commencer par « {letters(state['value'])[-1]} »."
+            if error:
+                penalty = self._penalize_game_error(con, guild, user, "words")
+                con.execute(
+                    "UPDATE games SET last_message=? WHERE guild=? AND channel=? AND kind='words'",
+                    (message, guild, channel),
+                )
+                return {"valid": False, "error": error, **penalty}
             self.cooldown(con, guild, user, "words", self.config.rules.words_cooldown)
             con.execute("INSERT INTO words VALUES(?,?,?,?)", (guild, channel, state["round"], word))
             score = state["score"] + 1

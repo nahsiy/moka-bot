@@ -4,11 +4,14 @@ build-backend = "hatchling.build"
 
 [project]
 name = "moka-community-bot"
-version = "0.1.0"
+version = "0.2.0"
 description = "Un compagnon Discord modulaire pour les communautés francophones."
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = ["discord.py>=2.6,<3"]
+dependencies = [
+    "discord.py>=2.6,<3",
+    "pillow>=11,<13",
+]
 
 [project.optional-dependencies]
 dev = ["pytest>=8,<10", "pytest-asyncio>=0.25,<2", "ruff>=0.11,<1"]
@@ -18,6 +21,15 @@ moka = "moka.__main__:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/moka"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src/moka", "/tests", "/docs", "/assets/branding", "/assets/previews",
+    "/pyproject.toml", "/uv.lock", "/README.md", "/CHANGELOG.md",
+    "/THIRD_PARTY_NOTICES.md", "/LICENSE", "/PLAN.md", "/SECURITY.md",
+    "/config.example.toml", "/config.test.toml", "/Dockerfile", "/compose.yaml",
+    "/.env.example", "/.dockerignore", "/.python-version", "/.github/workflows/ci.yml",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

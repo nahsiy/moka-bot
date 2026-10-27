@@ -70,7 +70,7 @@ class SafeView(discord.ui.View):
 def event_embed(event, service):
     kind, result, data = event["kind"], event["result"], event["payload"]
     names = {
-        "goblin": "👺 Le gobelin du QG",
+        "goblin": "👺 Le gobelin du serveur",
         "jackpot": "🎟️ Jackpot",
         "hack": "💻 Opération virtuelle",
     }

@@ -86,8 +86,13 @@ class StaffCog(commands.Cog):
             other = "words" if usage == "counting" else "counting"
             if self.bot.channel_id(guild, other) == salon.id:
                 raise DomainError("Choisis deux salons distincts pour counting et suite de mots.")
+        await interaction.response.defer(ephemeral=True)
         self.service.set_setting(guild, "channel:" + usage, salon.id)
-        await interaction.response.send_message(
+        if usage in {"counting", "words"}:
+            role_id = self.bot.role_id(guild, "counting_failure")
+            if role := interaction.guild.get_role(role_id) if role_id else None:
+                await self.bot.get_cog("CommunityCog").configure_game_role(interaction.guild, role)
+        await interaction.followup.send(
             f"Usage **{usage}** affecté à {salon.mention}.", ephemeral=True
         )
 
@@ -110,8 +115,11 @@ class StaffCog(commands.Cog):
         if usage not in ROLES:
             raise DomainError("Usage de rôle inconnu.")
         self.bot.get_cog("CommunityCog").safe_role(interaction.guild, role)
+        await interaction.response.defer(ephemeral=True)
         self.service.set_setting(guild, "role:" + usage, role.id)
-        await interaction.response.send_message(
+        if usage == "counting_failure":
+            await self.bot.get_cog("CommunityCog").configure_game_role(interaction.guild, role)
+        await interaction.followup.send(
             f"Rôle **{role.name}** affecté à **{usage}**.", ephemeral=True
         )
 
@@ -197,6 +205,50 @@ class StaffCog(commands.Cog):
         await interaction.response.send_message(
             "Nouvelle partie initialisée. Le record est conservé.", ephemeral=True
         )
+
+    @config.command(name="comptage", description="Consulter le counting ou régler son amende")
+    async def counting_rules(
+        self,
+        interaction: discord.Interaction,
+        amende: app_commands.Range[int, 0, 1_000_000] | None = None,
+    ):
+        guild, _, _ = staff(interaction)
+        if amende is not None:
+            self.service.set_setting(guild, "counting:fine", amende)
+        channel = self.bot.channel_id(guild, "counting")
+        state = self.service.counting_status(guild, channel)
+        await interaction.response.send_message(
+            f"**Salon :** {f'<#{channel}>' if channel else 'non configuré'}\n"
+            f"**Prochain nombre :** {state['next']} · **Record :** {state['record']}\n"
+            f"**Amende :** {state['fine']} ❤️ (portefeuille uniquement)\n"
+            "Calculs acceptés · auteurs alternés · texte = erreur · pile ou face à chaque erreur.",
+            ephemeral=True,
+        )
+
+    @app_commands.command(
+        name="debloquer", description="Lever la pause des jeux et retirer Pas-doué"
+    )
+    @app_commands.default_permissions(manage_guild=True)
+    async def unpause(self, interaction: discord.Interaction, membre: discord.Member):
+        guild, actor, key = staff(interaction)
+        if membre.bot or membre.guild.id != guild:
+            raise DomainError("Choisis une personne de ce serveur.")
+        await interaction.response.defer(ephemeral=True)
+        result = self.service.release_game_penalty(guild, membre.id, key)
+        pending = await self.bot.get_cog("CommunityCog").release_game_roles(
+            interaction.guild, membre.id, result["roles"]
+        )
+        if self.service.game_penalty(guild, membre.id):
+            text = "Une nouvelle sanction est active ; elle n'a pas été annulée par cette demande."
+        elif pending:
+            text = "La pause est levée, mais Discord n'a pas encore retiré le rôle. Moka réessaie automatiquement ; le rôle peut encore empêcher l'écriture."
+        else:
+            text = f"✅ Sanction levée pour {membre.mention} : accès aux deux jeux rétabli."
+        await interaction.followup.send(text, ephemeral=True)
+        if not result["replayed"]:
+            await self.bot.audit(
+                interaction.guild, f"Pause des jeux levée pour {membre.id} par {actor}."
+            )
 
     @config.command(
         name="ajuster_coeurs", description="Correction manuelle d'un solde fictif, journalisée"

@@ -19,6 +19,41 @@ from moka.store import Store
 log = logging.getLogger(__name__)
 
 
+def counting_failure_text(result):
+    reason = {
+        "expression": "ici, il faut écrire un nombre ou un calcul valide",
+        "not_integer": "le résultat doit être un nombre entier",
+        "same_user": "il faut laisser compter un autre membre entre deux essais",
+        "number": f"on attendait **{result['expected']}**",
+    }[result["reason"]]
+    if not result["economy"]:
+        fine = "Économie désactivée : aucune amende."
+    elif not result["configured_fine"]:
+        fine = "Amende désactivée."
+    elif result["fine"]:
+        fine = f"Amende : **{result['fine']} ❤️**."
+        if result["fine"] < result["configured_fine"]:
+            fine += " C'est tout le portefeuille !"
+    else:
+        fine = "Portefeuille vide : aucune amende prélevée."
+    coin = (
+        "🪙 **Face !** On recommence à **1**."
+        if result["restart"]
+        else f"🪙 **Pile !** La série continue : prochain nombre **{result['next']}**."
+    )
+    return f"❌ {reason}. {fine}\n{coin}" + game_penalty_text(result)
+
+
+def game_penalty_text(result):
+    if not result.get("penalty_until"):
+        return ""
+    return (
+        f"\n🎭 Rôle <@&{result['penalty_role']}> : pause dans les deux jeux "
+        f"jusqu’à <t:{int(result['penalty_until'])}:t> "
+        f"(<t:{int(result['penalty_until'])}:R>)."
+    )
+
+
 class Tree(app_commands.CommandTree):
     async def interaction_check(self, interaction):
         if not interaction.guild_id:
@@ -57,10 +92,12 @@ class MokaBot(commands.Bot):
     async def setup_hook(self):
         from moka.cogs.community import CommunityCog
         from moka.cogs.members import MembersCog
+        from moka.cogs.rates import RatesCog
         from moka.cogs.staff import StaffCog
 
         self.store.initialize()
         await self.add_cog(MembersCog(self))
+        await self.add_cog(RatesCog(self))
         await self.add_cog(StaffCog(self))
         await self.add_cog(CommunityCog(self))
         self.add_view(JoinView())
@@ -119,6 +156,23 @@ class MokaBot(commands.Bot):
                     community.safe_role(member.guild, role)
                     await member.add_roles(role, reason="Moka : récompense de niveau")
 
+    async def apply_game_penalty(self, message, result):
+        if not result.get("penalty_role"):
+            return
+        community = self.get_cog("CommunityCog")
+        if not community:
+            return
+        with self.store.read() as con:
+            grant = con.execute(
+                "SELECT * FROM role_grants WHERE guild=? AND user=? AND role=?",
+                (message.guild.id, message.author.id, result["penalty_role"]),
+            ).fetchone()
+        if grant:
+            try:
+                await community.apply_role_grant(message.guild, dict(grant), self.service.clock())
+            except (DomainError, discord.HTTPException):
+                log.exception("Rôle de jeu non attribué ; la maintenance réessaiera")
+
     async def on_message(self, message):
         if (
             not message.guild
@@ -130,7 +184,12 @@ class MokaBot(commands.Bot):
         guild = message.guild.id
         try:
             activity_result = None
-            if message.content.strip() and self.service.is_enabled(guild, "xp"):
+            game_channel = message.channel.id in {
+                self.channel_id(guild, "counting"),
+                self.channel_id(guild, "words"),
+            }
+            paused = game_channel and self.service.game_penalty(guild, message.author.id)
+            if message.content.strip() and not paused and self.service.is_enabled(guild, "xp"):
                 # Cooldown normal, sans polluer le salon.
                 with contextlib.suppress(DomainError):
                     activity_result = self.service.activity(
@@ -142,11 +201,20 @@ class MokaBot(commands.Bot):
                 result = self.service.counting(
                     guild, message.channel.id, message.author.id, message.content, message.id
                 )
+                if result.get("blocked"):
+                    if not result.get("replayed"):
+                        await self.apply_game_penalty(message, result)
+                        await message.reply(
+                            "⏳ Tu es encore en pause." + game_penalty_text(result),
+                            mention_author=False,
+                        )
+                    return
                 if not result.get("ignored") and not result.get("replayed"):
+                    await self.apply_game_penalty(message, result)
                     await message.add_reaction("✅" if result["valid"] else "❌")
                     if not result["valid"]:
                         await message.reply(
-                            f"Oups ! On attendait **{result['expected']}**, avec un autre membre que le précédent. On repart à **1**.",
+                            counting_failure_text(result),
                             mention_author=False,
                         )
                     elif result["reward"]:
@@ -160,8 +228,21 @@ class MokaBot(commands.Bot):
                     result = self.service.word(
                         guild, message.channel.id, message.author.id, message.content, message.id
                     )
+                    if result.get("blocked"):
+                        if not result.get("replayed"):
+                            await self.apply_game_penalty(message, result)
+                            await message.reply(
+                                "⏳ Tu es encore en pause." + game_penalty_text(result),
+                                mention_author=False,
+                            )
+                        return
                     if not result.get("ignored") and not result.get("replayed"):
-                        await message.add_reaction("✅")
+                        await self.apply_game_penalty(message, result)
+                        await message.add_reaction("✅" if result["valid"] else "❌")
+                        if not result["valid"]:
+                            await message.reply(
+                                result["error"] + game_penalty_text(result), mention_author=False
+                            )
                 except DomainError as error:
                     await message.reply(str(error), mention_author=False, delete_after=15)
             community = self.get_cog("CommunityCog")

@@ -54,6 +54,7 @@ async def check_commands(config):
     from moka.bot import MokaBot
     from moka.cogs.community import CommunityCog
     from moka.cogs.members import MembersCog
+    from moka.cogs.rates import RatesCog
     from moka.cogs.staff import StaffCog
 
     # Pas de setup_hook (ni tâches ni synchronisation ni base utilisateur).
@@ -61,6 +62,7 @@ async def check_commands(config):
         config = replace(config, data_dir=Path(tmp), sync_commands=False)
         bot = MokaBot(config)
         await bot.add_cog(MembersCog(bot))
+        await bot.add_cog(RatesCog(bot))
         await bot.add_cog(StaffCog(bot))
         await bot.add_cog(CommunityCog(bot))
         commands = [command.to_dict(bot.tree) for command in bot.tree.get_commands()]

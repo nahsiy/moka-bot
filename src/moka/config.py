@@ -18,6 +18,7 @@ FEATURES = frozenset(
         "counting",
         "words",
         "fun",
+        "rates",
         "horoscope",
         "shop",
         "roles",
@@ -65,7 +66,8 @@ class Rules:
     robbery_protection_seconds: int = 1800
     counting_reward_every: int = 100
     counting_reward: int = 100
-    counting_failure_seconds: int = 10800
+    counting_fine: int = 1000
+    counting_failure_seconds: int = 3600
     words_cooldown: int = 10
     goblin_seconds: int = 60
     goblin_min_players: int = 3

@@ -14,7 +14,127 @@ def test_counting_alternation_reset_and_message_replay(service):
     assert service.counting(1, 5, 10, "2", 104)["valid"]
     assert service.counting(1, 5, 11, "1", 103)["replayed"]
     assert service.counting(1, 5, 11, "3", 105)["valid"]
-    assert service.counting(1, 5, 10, "bonjour", 106)["ignored"]
+    assert service.counting(1, 5, 10, "bonjour", 106)["reason"] == "expression"
+
+
+@pytest.mark.parametrize(("draw", "score", "next_number"), [(0.1, 0, 1), (0.9, 2, 3)])
+def test_counting_error_coin_fine_and_restart(service, fund, draw, score, next_number):
+    from moka.service import Service
+
+    fund(10, 3000)
+    service.counting(1, 5, 10, "1", 101)
+    service.counting(1, 5, 11, "1+1", 102)
+    service.rng.value = draw
+    error = service.counting(1, 5, 10, "bonjour", 103)
+    assert not error["valid"] and error["reason"] == "expression"
+    assert error["score"] == score and error["next"] == next_number
+    assert error["fine"] == 1000 and error["restart"] == (draw < 0.5)
+    assert error["record"] == 2
+    assert service.profile(1, 10, viewer=10)["wallet"] == 2000
+
+    # Le reçu survit au redémarrage : ni second prélèvement ni nouveau tirage.
+    class NoDraw:
+        def random(self):
+            pytest.fail("Le reçu ne doit pas relancer la pièce")
+
+    restarted = Service(service.store, service.config, clock=service.clock, rng=NoDraw())
+    replayed = restarted.counting(1, 5, 10, "bonjour", 103)
+    assert replayed == {**error, "replayed": True}
+    assert restarted.profile(1, 10, viewer=10)["wallet"] == 2000
+    # Après une erreur, l'auteur précédent peut reprendre même sur Pile.
+    result = restarted.counting(1, 5, 11, str(next_number), 104)
+    assert result["valid"]
+
+
+def test_counting_fine_never_touches_bank_or_overdraws_wallet(service, fund):
+    fund(10, 250)
+    with service.store.transaction() as con:
+        service.money(con, 1, 10, wallet=-200, bank=200, reason="test-deposit")
+    error = service.counting(1, 5, 10, "1/2", 101)
+    assert error["reason"] == "not_integer" and error["fine"] == 50
+    profile = service.profile(1, 10, viewer=10)
+    assert profile["wallet"] == 0 and profile["bank"] == 200
+    assert service.counting(1, 5, 10, "oops", 102)["fine"] == 0
+
+
+def test_counting_configured_fine_and_disabled_economy(service, fund):
+    fund(10, 5000)
+    service.set_setting(1, "counting:fine", 75)
+    assert service.counting(1, 5, 10, "bad", 101)["fine"] == 75
+    service.set_setting(1, "counting:fine", 0)
+    assert service.counting(1, 5, 10, "bad", 102)["fine"] == 0
+    service.set_setting(1, "counting:fine", 1000)
+    service.set_setting(1, "feature:economy", False)
+    assert service.counting(1, 5, 10, "bad", 103)["fine"] == 0
+    assert service.profile(1, 10, viewer=10)["wallet"] == 4925
+
+
+def test_counting_concurrent_replay_charges_and_draws_once(service, fund):
+    fund(10, 3000)
+
+    class CountDraws:
+        calls = 0
+
+        def random(self):
+            self.calls += 1
+            return 0.9
+
+    service.rng = CountDraws()
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(lambda _: service.counting(1, 5, 10, "bad", 101), range(2)))
+    assert sum(r["replayed"] for r in results) == 1
+    assert service.rng.calls == 1
+    assert service.profile(1, 10, viewer=10)["wallet"] == 2000
+    with service.store.read() as con:
+        assert (
+            con.execute("SELECT COUNT(*) FROM ledger WHERE reason='counting-fine'").fetchone()[0]
+            == 1
+        )
+
+
+def test_counting_concurrent_answers_and_guild_channel_isolation(service, fund):
+    fund(10, 1000)
+    fund(11, 1000)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(
+            pool.map(lambda user: service.counting(1, 5, user, "1", 91 + user), (10, 11))
+        )
+    assert sum(r.get("valid", False) for r in results) == 1
+    assert sum(r.get("fine", 0) for r in results) <= 1000
+    assert service.counting(2, 5, 10, "1", 201)["valid"]
+    assert service.counting(1, 6, 10, "1", 301)["valid"]
+    assert service.profile(2, 10, viewer=10)["wallet"] == 0
+    with pytest.raises(DomainError, match="autorisé"):
+        service.counting(999, 5, 10, "bad", 401)
+
+
+def test_counting_stale_message_does_not_charge_or_reset(service, fund):
+    fund(10, 1000)
+    service.counting(1, 5, 11, "1", 102)
+    assert service.counting(1, 5, 10, "bad", 101)["ignored"]
+    assert service.profile(1, 10, viewer=10)["wallet"] == 1000
+    assert service.counting_status(1, 5)["next"] == 2
+
+
+def test_counting_reward_at_account_cap_does_not_break_sequence(service, fund):
+    fund(10, service.config.rules.max_amount)
+    service.config = replace(
+        service.config, rules=replace(service.config.rules, counting_reward_every=1)
+    )
+    result = service.counting(1, 5, 10, "1", 101)
+    assert result["valid"] and result["reward"] == 0
+    service.set_setting(1, "feature:economy", False)
+    assert service.counting(1, 5, 11, "2", 102)["reward"] == 0
+
+
+def test_counting_optional_penalty_can_be_disabled(service):
+    service.set_setting(1, "role:counting_failure", 99)
+    service.config = replace(
+        service.config, rules=replace(service.config.rules, counting_failure_seconds=0)
+    )
+    service.counting(1, 5, 10, "bad", 101)
+    with service.store.read() as con:
+        assert con.execute("SELECT COUNT(*) FROM role_grants").fetchone()[0] == 0
 
 
 def test_counting_milestone_paid_once_and_penalty_persisted(service):
@@ -29,7 +149,7 @@ def test_counting_milestone_paid_once_and_penalty_persisted(service):
     service.counting(1, 5, 10, "999", 103)
     with service.store.read() as con:
         grant = con.execute("SELECT * FROM role_grants").fetchone()
-        assert grant["role"] == 99 and grant["until"] - service.clock() == 10800
+        assert grant["role"] == 99 and grant["until"] - service.clock() == 3600
 
 
 def test_word_modes_normalization_and_reset(fast_rules):
@@ -37,20 +157,17 @@ def test_word_modes_normalization_and_reset(fast_rules):
     s.set_setting(1, "words:mode", "last_letter")
     assert s.word(1, 5, 10, "Café", 101)["word"] == "café"
     assert s.word(1, 5, 11, "éléphant", 102)["valid"]
-    with pytest.raises(DomainError, match="commencer"):
-        s.word(1, 5, 10, "chat", 103)
+    assert "commencer" in s.word(1, 5, 10, "chat", 103)["error"]
     assert s.word(1, 5, 10, "tasse", 104)["valid"]
-    with pytest.raises(DomainError, match="déjà"):
-        s.word(1, 5, 11, "CAFÉ", 105)
+    assert "déjà" in s.word(1, 5, 11, "CAFÉ", 105)["error"]
     s.reset_game(1, 5, "words")
     assert s.word(1, 5, 10, "CAFÉ", 106)["valid"]
 
 
 def test_word_rejects_same_author_and_multiword_input(fast_rules):
     fast_rules.word(1, 5, 10, "soleil", 101)
-    with pytest.raises(DomainError, match="autre membre"):
-        fast_rules.word(1, 5, 10, "lune", 102)
-    assert fast_rules.word(1, 5, 11, "deux mots", 103)["ignored"]
+    assert "autre membre" in fast_rules.word(1, 5, 10, "lune", 102)["error"]
+    assert not fast_rules.word(1, 5, 11, "deux mots", 103)["valid"]
 
 
 def test_goblin_minimum_and_restart_settlement(service):

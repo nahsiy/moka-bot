@@ -21,23 +21,30 @@ async def prepare(guild, bot_member, service, *, expected_name=LAB_NAME):
     result = {"guild": guild.id, "roles": {}, "channels": {}}
     for name in (
         "Staff test",
-        "Pas doué (test)",
+        "Pas-doué",
         "Lecteur",
         "MP ouverts",
         "MP sur demande",
         "MP fermés",
     ):
         role = next((r for r in roles if r.name == name and not r.managed), None)
+        if role is None and name == "Pas-doué":
+            role = next((r for r in roles if r.name == "Pas doué (test)" and not r.managed), None)
+            if role:
+                role = await role.edit(name="Pas-doué", reason="Moka : rôle de pause des jeux")
         if role is None:
             role = await guild.create_role(
                 name=name,
                 permissions=discord.Permissions.none(),
+                hoist=name == "Pas-doué",
                 reason="Moka : préparation du laboratoire",
             )
             roles.append(role)
         # Même une relance ne récupère pas silencieusement un rôle privilégié.
         if role.permissions.value:
             raise ValueError(f"Le rôle de laboratoire {name} doit être sans permissions globales")
+        if name == "Pas-doué" and not role.hoist:
+            role = await role.edit(hoist=True, reason="Moka : afficher le groupe de pause")
         result["roles"][name] = role.id
 
     channels = await guild.fetch_channels()
@@ -121,7 +128,16 @@ async def prepare(guild, bot_member, service, *, expected_name=LAB_NAME):
     ):
         service.set_setting(guild.id, "channel:" + usage, channel_id)
         result["channels"][usage] = channel_id
-    service.set_setting(guild.id, "role:counting_failure", result["roles"]["Pas doué (test)"])
+    service.set_setting(guild.id, "role:counting_failure", result["roles"]["Pas-doué"])
+    penalty_role = next(r for r in roles if r.id == result["roles"]["Pas-doué"])
+    for usage in ("counting", "words"):
+        channel = next(c for c in channels if c.id == result["channels"][usage])
+        overwrite = channel.overwrites_for(penalty_role)
+        overwrite.send_messages = False
+        overwrite.send_messages_in_threads = False
+        await channel.set_permissions(
+            penalty_role, overwrite=overwrite, reason="Moka : pause commune aux deux jeux"
+        )
     service.set_setting(guild.id, "ticket_staff_roles", [result["roles"]["Staff test"]])
     service.set_setting(
         guild.id,

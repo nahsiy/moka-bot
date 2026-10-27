@@ -13,6 +13,7 @@ goblin = true
 counting = true
 words = true
 fun = true
+rates = true
 horoscope = true
 shop = true
 roles = true
@@ -33,7 +34,10 @@ weekly_coins = 1500
 bank_capacity = 1000
 bank_interest_bps = 100
 bank_interest_max_bps = 500
-counting_failure_seconds = 10800
+# Pause commune au counting et à la suite de mots ; 0 désactive les nouvelles pauses.
+counting_failure_seconds = 3600
+# Amende sur le portefeuille ; 0 la désactive. Réglable aussi par /config comptage.
+counting_fine = 1000
 goblin_seconds = 60
 goblin_min_players = 3
 goblin_max_players = 20

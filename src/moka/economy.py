@@ -6,7 +6,7 @@ from moka.base import BaseService, DomainError
 CATALOG = {
     "cafe": {"name": "Café virtuel", "price": 50},
     "biscuit": {"name": "Biscuit porte-bonheur", "price": 100},
-    "trophee": {"name": "Petit trophée du QG", "price": 500},
+    "trophee": {"name": "Petit trophée du serveur", "price": 500},
 }
 
 

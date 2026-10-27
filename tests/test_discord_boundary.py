@@ -14,7 +14,7 @@ from moka.cogs.community import (
     RoleSelect,
     TicketPanelView,
 )
-from moka.cogs.staff import staff
+from moka.cogs.staff import StaffCog, staff
 from moka.config import Config
 from moka.discord_ui import HackView, JoinView, event_embed, interaction_event
 
@@ -46,7 +46,7 @@ async def test_persistent_buttons_survive_restart():
 async def test_expired_role_is_removed_after_restart_even_if_module_disabled(service):
     service.set_setting(1, "role:counting_failure", 55)
     service.counting(1, 5, 10, "8", 1001)
-    service.clock.advance(10801)
+    service.clock.advance(3601)
     service.set_setting(1, "feature:counting", False)
     role = SimpleNamespace(id=55)
     member = SimpleNamespace(id=10, roles=[role], remove_roles=AsyncMock())
@@ -216,6 +216,50 @@ async def test_voice_tick_with_real_discord_guild(service):
     await MokaBot.voice_rewards.coro(bot)
     assert bot.voice_eligible == set()
     assert bot.last_voice_tick is not None
+    await bot.close()
+
+
+async def test_counting_staff_setting_checks_permission_and_persists(service):
+    i = fake_interaction(service, manage=False)
+    i.response = SimpleNamespace(send_message=AsyncMock())
+    cog = StaffCog(SimpleNamespace(service=service, channel_id=lambda *_: 5))
+    with pytest.raises(DomainError, match="permission"):
+        await StaffCog.counting_rules.callback(cog, i, 75)
+    assert service.get_setting(1, "counting:fine") is None
+    i.user.guild_permissions = discord.Permissions(manage_guild=True)
+    await StaffCog.counting_rules.callback(cog, i, 75)
+    assert service.counting_status(1, 5)["fine"] == 75
+    assert "Prochain nombre" in i.response.send_message.call_args.args[0]
+    assert i.response.send_message.call_args.kwargs["ephemeral"]
+
+
+@pytest.mark.parametrize(("draw", "coin", "next_number"), [(0.1, "Face", 1), (0.9, "Pile", 2)])
+async def test_counting_discord_replies_and_replay(service, fund, draw, coin, next_number):
+    fund(10, 1500)
+    service.set_setting(1, "feature:xp", False)
+    service.set_setting(1, "channel:counting", 5)
+    service.counting(1, 5, 11, "1", 100)
+    service.rng.value = draw
+    bot = MokaBot(service.config, service=service)
+    message = SimpleNamespace(
+        guild=SimpleNamespace(id=1),
+        author=SimpleNamespace(id=10, bot=False),
+        channel=SimpleNamespace(id=5),
+        content="bonjour",
+        id=101,
+        webhook_id=None,
+        add_reaction=AsyncMock(),
+        reply=AsyncMock(),
+    )
+    await bot.on_message(message)
+    message.add_reaction.assert_awaited_once_with("❌")
+    response = message.reply.call_args.args[0]
+    assert coin in response and "1000 ❤️" in response
+    assert f"**{next_number}**" in response
+    assert message.reply.call_args.kwargs["mention_author"] is False
+    await bot.on_message(message)
+    assert message.reply.await_count == 1
+    assert service.profile(1, 10, viewer=10)["wallet"] == 500
     await bot.close()
 
 

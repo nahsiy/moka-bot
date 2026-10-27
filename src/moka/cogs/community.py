@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import weakref
 
 import discord
 from discord import app_commands
@@ -174,6 +175,7 @@ class CommunityCog(commands.Cog):
         self.ticket_lock = asyncio.Lock()
         self.voice_lock = asyncio.Lock()
         self.last_reconcile = {}
+        self.role_locks = weakref.WeakValueDictionary()
 
     @staticmethod
     def safe_role(guild, role):
@@ -533,28 +535,80 @@ class CommunityCog(commands.Cog):
         if user and guild:
             await self.sync_photo_role(guild, user)
 
+    async def configure_game_role(self, guild, role):
+        self.safe_role(guild, role)
+        if not role.hoist:
+            await role.edit(hoist=True, reason="Moka : afficher séparément le rôle de pause")
+        for usage in ("counting", "words"):
+            channel_id = self.bot.channel_id(guild.id, usage)
+            if not channel_id:
+                continue
+            channel = guild.get_channel(channel_id) or await guild.fetch_channel(channel_id)
+            if not isinstance(channel, discord.TextChannel):
+                raise DomainError("Le salon de jeu doit être un salon textuel.")
+            overwrite = channel.overwrites_for(role)
+            overwrite.send_messages = False
+            overwrite.send_messages_in_threads = False
+            await channel.set_permissions(
+                role, overwrite=overwrite, reason="Moka : pause commune aux deux jeux"
+            )
+
     async def apply_role_grant(self, guild, grant, now):
+        lock = self.role_locks.setdefault((guild.id, grant["user"]), asyncio.Lock())
+        async with lock:
+            # Une ancienne capture de maintenance ne peut pas réactiver une sanction levée.
+            with self.bot.store.read() as con:
+                current = con.execute(
+                    "SELECT * FROM role_grants WHERE guild=? AND user=? AND role=?",
+                    (guild.id, grant["user"], grant["role"]),
+                ).fetchone()
+            if current:
+                await self._apply_role_grant(guild, dict(current), max(now, self.service.clock()))
+
+    async def release_game_roles(self, guild, user, roles):
+        for role_id in roles:
+            with self.bot.store.read() as con:
+                grant = con.execute(
+                    "SELECT * FROM role_grants WHERE guild=? AND user=? AND role=? AND reason IN ('counting','words') AND until<=?",
+                    (guild.id, user, role_id, self.service.clock()),
+                ).fetchone()
+            if grant:
+                try:
+                    await self.apply_role_grant(guild, dict(grant), self.service.clock())
+                except (DomainError, discord.HTTPException):
+                    log.exception("Retrait du rôle de jeu différé ; la maintenance réessaiera")
+        with self.bot.store.read() as con:
+            pending = con.execute(
+                "SELECT 1 FROM role_grants WHERE guild=? AND user=? AND reason IN ('counting','words') AND until<=?",
+                (guild.id, user, self.service.clock()),
+            ).fetchone()
+        return bool(pending)
+
+    async def _apply_role_grant(self, guild, grant, now):
         role = guild.get_role(grant["role"])
         member = guild.get_member(grant["user"])
-        if not role or not member:
-            with self.bot.store.transaction() as con:
-                con.execute(
-                    "DELETE FROM role_grants WHERE guild=? AND user=? AND role=?",
-                    (guild.id, grant["user"], grant["role"]),
-                )
+        if not member:
+            try:
+                member = await guild.fetch_member(grant["user"])
+            except discord.NotFound:
+                # Conserver une pause active : elle s'applique aussi après un retour.
+                if grant["until"] > now:
+                    return
+        if not role and grant["until"] > now:
+            # Un rôle supprimé ne doit pas lever la pause métier avant son terme.
             return
         if grant["until"] <= now:
             # Le retrait d'un rôle expiré reste possible même si ses droits ont changé.
-            if role in member.roles:
+            if member and role and role in member.roles:
                 await member.remove_roles(role, reason="Moka : rôle temporaire expiré")
             with self.bot.store.transaction() as con:
                 con.execute(
                     "DELETE FROM role_grants WHERE guild=? AND user=? AND role=? AND until<=?",
-                    (guild.id, member.id, role.id, now),
+                    (guild.id, grant["user"], grant["role"], now),
                 )
         elif not grant["applied"] or role not in member.roles:
             self.safe_role(guild, role)
-            await member.add_roles(role, reason="Moka : erreur de comptage")
+            await member.add_roles(role, reason="Moka : erreur dans un jeu")
             with self.bot.store.transaction() as con:
                 con.execute(
                     "UPDATE role_grants SET applied=1 WHERE guild=? AND user=? AND role=?",

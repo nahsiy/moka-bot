@@ -298,27 +298,13 @@ class MembersCog(commands.Cog):
         guild, user, key = context(interaction)
         target = member or interaction.user
         human(target)
-        compliments = [
-            "Tu as le talent de rendre une conversation plus agréable.",
-            "Tu mérites le dernier biscuit de la boîte.",
-            "Ta bonne humeur vaut toutes les réserves de café du QG.",
-        ]
-        taunts = [
-            "Même ton café a demandé cinq minutes de pause.",
-            "Tu es la mise à jour qui demande encore un redémarrage.",
-            "Ton sens de l'orientation ferait hésiter une boussole.",
-        ]
-
-        def run(con):
-            self.service.cooldown(con, guild, user, "fun", 15)
-            return {"text": self.service.rng.choice(taunts if insult else compliments)}
-
-        result = self.service.perform(guild, user, "fun", key, ["fun"], run)
+        result = self.service.social_message(guild, user, key, "taunt" if insult else "compliment")
         await interaction.response.send_message(
             embed=card(
                 "🙃 Petite taquinerie" if insult else "🌟 Un compliment",
-                f"**{target.display_name}**, {result['text']}",
-            )
+                f"**{discord.utils.escape_markdown(target.display_name)}**\n\n{result['text']}",
+            ),
+            allowed_mentions=discord.AllowedMentions.none(),
         )
 
     @app_commands.command(name="compliment", description="Faire un compliment à un membre")
@@ -416,7 +402,7 @@ class MembersCog(commands.Cog):
             name for name in self.bot.config.features if self.service.is_enabled(guild, name)
         )
         text = (
-            "**Progression** : /profile · /xp consulter · /xp classement\n**Économie** : /argent · /banque · /donner\n**Distractions** : /parier · /voler · /hack · /jackpot\n**Objets** : /boutique · /acheter · /inventaire · /offrir\n**Ambiance** : /compliment · /insulter · /horoscope\n**Communauté** : /ticket · /roles · /vocal\n**Données** : /confidentialite · /mes_donnees · /oublier\n**Staff** : /config · /animation · /moderation · /diagnostic\n\nModules activés : "
+            "**Progression** : /profile · /xp consulter · /xp classement\n**Économie** : /argent · /banque · /donner\n**Distractions** : /parier · /voler · /hack · /jackpot\n**Objets** : /boutique · /acheter · /inventaire · /offrir\n**Ambiance** : /compliment · /insulter · /horoscope\n**Taux du jour** : /taux · /duo\n**Communauté** : /ticket · /roles · /vocal\n**Données** : /confidentialite · /mes_donnees · /oublier\n**Staff** : /config · /animation · /moderation · /debloquer · /diagnostic\n\nModules activés : "
             + ", ".join(enabled)
         )
         await interaction.response.send_message(

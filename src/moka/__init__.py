@@ -1,3 +1,3 @@
 """Moka, compagnon de communauté. Aucun effet externe à l'import."""
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
