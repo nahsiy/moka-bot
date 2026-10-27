@@ -12,22 +12,19 @@ paris, jackpot, vol, hack, gobelin ; counting et suite de mots ; animations ;
 rôles, tickets et automatismes communautaires. Pas de gemmes ni de fabrication
 de gemmes. Boutique en cœurs. Modules indépendants pour cohabiter avec DraftBot.
 
-## Preuves et inconnues
+## Périmètre et références
 
-- Ancien guide de Sylhaance, 22 octobre 2026, lu dans distractions : XP,
-  économie/banque, vol, hack, profils et boutique.
-- Messages du bot : gobelin collectif (minimum de participants et délai),
-  jackpot, compliments/taquineries et horoscope.
-- Capture fournie par Chris : counting repris par DraftBot ; rôle d'erreur
-  durant trois heures. Rôles/tickets DraftBot également observés.
-- Chris confirme que le reste de distractions marchait bien et demande la
-  suite de mots. Ses règles exactes restent inconnues : prévoir des modes
-  explicitement configurés, sans prétendre reproduire des règles non vérifiées.
-- Modération interne, salons temporaires et trombinoscope : périmètre à
-  confronter au staff. Les mécanismes livrés doivent être documentés comme
-  une proposition, et non comme une reproduction exacte de l'ancien bot.
-- Aucun code, texte, graphique, token ni base de l'ancien bot disponible.
-  Réimplémentation originale, aucune promesse de récupération des soldes.
+- Implémentation originale : aucun ancien solde, niveau, inventaire, token ou
+  fichier privé n'est récupéré automatiquement.
+- La suite de mots utilise l'association d'idées libre par défaut ; le mode
+  dernière lettre reste optionnel. Le bot contrôle la forme, les doublons et
+  l'alternance, sans prétendre juger le lien sémantique.
+- Le counting et les taux ludiques s'inspirent de comportements décrits dans
+  un dépôt public MIT ; les références et crédits figurent dans les guides.
+- Les montants, catalogue et règles sont modifiables, sans promesse de parité
+  complète avec un ancien bot communautaire.
+- Les essais réels et les parcours restant à tester sont documentés séparément
+  dans `docs/VALIDATION.md`.
 
 ## Étapes et critères
 
@@ -60,7 +57,6 @@ de gemmes. Boutique en cœurs. Modules indépendants pour cohabiter avec DraftBo
 
 ## Hors de cette étape
 
-Installation dans le QG, dépenses/hébergement de production, publication
-GitHub, envoi à la fondatrice ou à Alf, nom définitif et validation en vrai
-serveur : à faire explicitement ensuite. Les tests locaux ne prouvent pas la
+Installation dans une communauté, dépenses et hébergement de production :
+à décider explicitement par les responsables du serveur. Les tests locaux ne prouvent pas la
 validation des permissions ni le rendu dans Discord.

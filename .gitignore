@@ -13,3 +13,6 @@ backups/
 *.sqlite*
 *.db
 .DS_Store
+# Captures du client Discord : conserver ces preuves uniquement en local.
+assets/branding/discord-preview.png
+docs/images/discord-*.png

@@ -10,3 +10,7 @@ __pycache__
 .ruff_cache
 *.sqlite*
 *.db
+dist
+build
+assets
+docs

@@ -4,31 +4,37 @@ Un compagnon Discord francophone : discussions, progression et petites
 animations pour faire vivre une communauté. Python 3.12+, SQLite, modules
 activables séparément. Aucun service payant ni modèle IA requis.
 
-**Version 0.1.0 : prototype avec une première démo réelle dans Discord et
-61 tests locaux réussis.** Aide, récompense quotidienne, profil, rôle à choisir,
-création de ticket, counting, suite de mots et gobelin après redémarrage ont été
-essayés sur un serveur dédié. L'XP vocal à deux personnes et les autres parcours
-restent à valider : [détail des vérifications](docs/VALIDATION.md).
+**Version 0.2.0 : jeux de salon enrichis, cartes illustrées et 188 tests locaux
+réussis.** Counting avec calculs et pile ou face, pause commune aux deux jeux,
+déblocage par le staff, 14 taux et duos illustrés, 100 compliments et taquineries.
+Plusieurs parcours ont été essayés dans un laboratoire Discord ; l'XP vocal à
+deux personnes et la recette complète restent à valider :
+[détail des vérifications](docs/VALIDATION.md).
 
 Moka peut servir de base commune : code Python modifiable, licence MIT et
 hébergement au choix de l'équipe. Chaque module peut être activé séparément,
 notamment pour conserver les fonctions déjà assurées par un autre bot.
 
-## Voir Moka dans Discord
+## Les cartes de Moka
 
-Captures réelles du laboratoire personnel, le 25 octobre 2026. Elles montrent
-le compte du testeur et le bot ; aucun échange de membres du serveur cible.
-Cliquer sur une image permet de la lire en grand.
+Ces exemples sont générés par le véritable moteur de cartes, avec la mascotte
+Moka et des noms fictifs. Les pourcentages sont illustratifs : ce sont des
+aperçus, pas des captures du client Discord. Aucun avatar humain, identifiant
+de membre ni conversation privée n'est inclus dans ces visuels.
 
-![Profil, menu de rôles, ticket et gobelin dans le serveur de test](docs/images/discord-demo.png)
+![Exemple de carte de choupitude avec la mascotte Moka](docs/images/taux-choupitude.png)
 
-Le bouton du gobelin a survécu à un redémarrage. Une deuxième participation a
-été refusée et une seule récompense de 100 cœurs a été versée.
+![Exemple de duo d'amitié avec deux noms fictifs](docs/images/duo-amitie.png)
 
-![Counting : nombre valide, erreur et retour à 1](docs/images/discord-counting.png)
+`/taux type:choupitude` découvre ton taux du jour ; `/duo type:amitie
+membre:@quelqu’un` mesure un duo pour rire. Huit types individuels et six duos,
+fixes jusqu'à minuit à Paris, avec avatars et illustrations partiellement
+colorées. Les pseudos grecs, cyrilliques et les emojis sont pris en charge.
 
-Le rôle de pénalité a été attribué puis retiré à échéance. Le laboratoire utilise
-un délai de 30 secondes ; la configuration par défaut prévoit trois heures.
+Le counting accepte les calculs et tire à pile ou face après une erreur, avec
+une amende configurable : [règles](docs/COUNTING.md). Le rôle **Pas-doué** impose
+une pause d'une heure dans les deux jeux ; le staff la lève avec
+`/debloquer membre` : [détails](docs/GAME-PENALTIES.md).
 
 Un [parcours de démonstration de cinq minutes](docs/DEMO.md) permet de présenter
 le bot au staff. Une démonstration locale sans compte Discord est aussi disponible
@@ -43,8 +49,9 @@ ci-dessous.
 | Banque | Dépôts, retraits, capacité, intérêts, amélioration de la protection |
 | Distractions | Paris, jackpot collectif, vol de portefeuille, mini-jeu de hack |
 | Gobelin | Groupe limité, compte à rebours, récompense collective, apparitions optionnelles |
-| Jeux de salon | Counting, record, rôle d'erreur temporaire ; suite de mots avec deux modes |
-| Ambiance | Compliments, taquineries légères, horoscope fictif |
+| Jeux de salon | Counting avec calculs, amende et pile ou face, record, rôle d'erreur temporaire ; suite de mots avec deux modes |
+| Ambiance | 50 compliments et 50 taquineries bienveillantes, cinq dernières phrases évitées, horoscope fictif |
+| Taux du jour | 8 taux individuels et 6 duos, cartes illustrées avec avatars, résultats fixes jusqu'à minuit |
 | Boutique | Objets décoratifs en cœurs, inventaire et cadeaux ; aucune gemme |
 | Communauté | Rôles à choisir, tickets privés, salons vocaux temporaires |
 | Trombinoscope | Pré-accès, niveau minimum, approbation du staff, retrait d'accès après suppression |
@@ -71,7 +78,7 @@ uv run pytest -q
 `check` construit et sérialise réellement l'arbre des commandes Discord, sans
 token ni requête réseau. `demo` joue un scénario dans une base SQLite jetable :
 récompenses, banque, achat, cadeau, counting, gobelin et sauvegarde. Ce scénario
-ne charge pas les membres du QG et ne crée aucun salon.
+ne charge aucun membre Discord et ne crée aucun salon.
 
 ## Installer sur un serveur de test
 
@@ -90,7 +97,11 @@ src/moka/
   base.py          Comptes, reçus, XP, transactions et configuration persistée
   economy.py       Banque, boutique, cadeaux, paris et vols
   games.py         Counting, mots, événements et règlements
-  community.py     États persistants des tickets et des photos
+  community.py     Tickets, photos et tirages des phrases d'ambiance
+  social_catalog.py  50 compliments et 50 taquineries originales
+  rates.py         Pourcentages quotidiens individuels et en duo
+  rate_cards.py    Rendu local des cartes, avatars et emojis
+  assets/          Illustrations et polices avec leurs licences
   bot.py           Connexion, événements Discord et tâches de reprise
   discord_ui.py    Cartes et boutons persistants
   cogs/            Commandes membres, staff et communauté
@@ -99,6 +110,10 @@ tests/             Tests métier, concurrence et frontière Discord
 
 - [Exploitation et sauvegardes](docs/EXPLOITATION.md)
 - [État de validation et recette Discord](docs/VALIDATION.md)
+- [Taux du jour, duos et illustrations](docs/RATES.md)
+- [Compliments et taquineries](docs/AMBIANCE.md)
+- [Changements et mise à jour](CHANGELOG.md)
+- [Crédits et licences des ressources](THIRD_PARTY_NOTICES.md)
 - [Périmètre et inconnues](PLAN.md)
 - [Sécurité](SECURITY.md)
 
@@ -120,6 +135,6 @@ aucun dashboard web, port entrant, Redis ou PostgreSQL n'est nécessaire.
 - [Discord : équipes de développement](https://docs.discord.com/developers/topics/teams)
 - [uv dans Docker](https://docs.astral.sh/uv/guides/integration/docker/)
 
-Les captures ci-dessus proviennent du vrai client Discord. Le scénario CLI est
-une démonstration hors ligne séparée ; il ne prouve pas le fonctionnement de
-tous les modules dans Discord.
+Les aperçus et la démonstration CLI sont produits hors ligne. Ils ne prouvent
+pas le fonctionnement de tous les modules dans Discord. Les essais réels sont
+décrits séparément dans [VALIDATION.md](docs/VALIDATION.md).

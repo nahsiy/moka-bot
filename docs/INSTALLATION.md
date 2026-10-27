@@ -17,7 +17,7 @@ idéalement rattachée à une équipe Discord avec des responsables durables.
 
 | Module | Permissions supplémentaires |
 | --- | --- |
-| Base / cartes | Voir le salon, envoyer des messages, intégrer des liens |
+| Base / cartes | Voir le salon, envoyer des messages, intégrer des liens ; joindre des fichiers pour les taux illustrés |
 | Jeux | Ajouter des réactions, lire l'historique |
 | Rôles et pénalités | Gérer les rôles ; rôle Moka au-dessus des rôles attribués |
 | Tickets | Gérer les salons ; staff des tickets explicitement configuré |
@@ -73,12 +73,18 @@ Avec un compte disposant de Gérer le serveur :
 /config salon usage:logs salon:#journal-moka
 /config salon usage:goblin salon:#distractions
 /config role usage:counting_failure role:@Pas-doué
+/config comptage amende:1000
 /config suite_mots mode:free
 ```
 
 Ces noms sont des exemples à créer sur le serveur de test. Ne pas activer deux
 bots de counting ou d'XP dans le même salon pendant un essai de transition.
 Les montants et délais sont dans `[rules]` du TOML ; ils demandent un redémarrage.
+L'amende de counting peut être changée immédiatement par `/config comptage` ;
+`amende:0` la désactive. Voir les [règles de counting](COUNTING.md).
+Le rôle `counting_failure` est commun aux deux jeux : sa configuration bloque
+l'écriture dans leurs deux salons pendant la pause. La durée par défaut est
+d'une heure, y compris dans le laboratoire : [détails](GAME-PENALTIES.md).
 Les commandes `/config` persistent les choix de salons/rôles/modules dans SQLite
 et prennent le dessus sur le TOML pour ces choix.
 
@@ -98,6 +104,19 @@ Le trombinoscope reste désactivé jusqu'au réglage de `trombi`, `trombi_review
 uniquement par le staff. Les droits du pré-accès et de l'accès complet sont à
 configurer explicitement sur les salons. Seuls les membres autorisés par ces
 rôles peuvent y soumettre une image. Pas d'accès automatique par simple message.
+
+## Nouveautés et mise à jour
+
+`/taux` et `/duo` utilisent le module `rates`, actif par défaut, et rendent les
+images localement avec Pillow. Les illustrations, polices et licences sont
+embarquées ; aucun service IA ni clé supplémentaire n'est nécessaire.
+`/compliment` et `/insulter` utilisent le module `fun` :
+[comportement](AMBIANCE.md). Les commandes peuvent s'utiliser dans un salon de
+distractions, sans configuration d'identifiant supplémentaire.
+
+Pour passer de 0.1.0 à 0.2.0, suivre [le guide de mise à jour](../CHANGELOG.md).
+Sauvegarder la base et resynchroniser une fois les commandes dans les seuls
+serveurs autorisés. Les pauses actives gardent leur échéance.
 
 ## Docker
 

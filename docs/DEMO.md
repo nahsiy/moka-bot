@@ -27,31 +27,46 @@ Les champs `backup_created` et `database_integrity` valent `true`.
 Un responsable démarre Moka avec la configuration de laboratoire et le token
 local. Voir [l'installation](INSTALLATION.md). Les visiteurs utilisent leur
 compte Discord habituel ; ils n'ont besoin ni du token ni du Developer Portal.
-Le bot tourne actuellement sur la machine de développement : organiser un
-créneau avec cette machine allumée et connectée.
+Le responsable choisit l'hébergement et organise un créneau avec une instance
+allumée et connectée.
 
 | Durée | Manipulation | À regarder |
 | --- | --- | --- |
 | 0–1 min | `/aide`, `/argent journalier`, `/profile` | Commandes françaises, réponse personnelle, portefeuille |
 | 1–2 min | Bouton « Choisir mes rôles », choisir Lecteur | Attribution réelle du rôle, menu configurable |
 | 2–3 min | `/ticket ouvrir` | Création d'un salon privé ; un deuxième compte ordinaire sert à vérifier la visibilité |
-| 3–4 min | Dans counting : `1`, puis `3` | Réactions, remise à zéro et pénalité de 30 secondes dans le laboratoire |
+| 3–4 min | Dans counting, à deux : `1`, puis `1+1` ; ensuite un mauvais nombre | Réactions, amende bornée au portefeuille et pile ou face (reprise ou retour à 1), rôle Pas-doué et pause commune d'une heure |
 | 4–5 min | Le staff lance `/animation lancer jeu:goblin`, puis bouton Participer | Compte à rebours de 30 secondes, inscription, règlement collectif |
 
 Avec deux personnes, alterner les auteurs pour avancer dans counting et
 suite-de-mots. La suite de mots utilise ici l'association libre : un mot inédit
-par message, avec alternance des auteurs. L'ancien fonctionnement exact de la
-communauté cible reste à confirmer.
+par message, avec alternance des auteurs. Le lien entre les mots est apprécié
+par les joueurs, sans évaluation sémantique automatique.
 
 Pour revoir la reprise d'un gobelin, le responsable peut redémarrer le processus
 pendant les 30 secondes : le même message et son bouton restent utilisables.
 Le résultat et le journal économique permettent de vérifier le paiement unique.
 
+
+Pour une démo des nouveautés, utiliser aussi dans le salon de distractions :
+
+```text
+/taux type:choupitude
+/duo type:amitie membre:@quelqu’un
+/compliment membre:@quelqu’un
+/insulter membre:@quelqu’un
+```
+
+Attendre quinze secondes entre compliment et taquinerie. Les pourcentages du
+jour restent identiques jusqu'à minuit à Paris. Pour rendre immédiatement
+l'accès aux deux jeux à un participant suspendu, le staff utilise
+`/debloquer membre:@quelqu’un`.
+
 ## Ce que cette démo établit
 
-Les [captures](images/discord-demo.png) et le [compte rendu](VALIDATION.md)
-documentent les parcours réellement essayés. Le [counting](images/discord-counting.png)
-a aussi été vérifié avec attribution et expiration du rôle temporaire.
+Le [compte rendu](VALIDATION.md) décrit les parcours réellement essayés,
+dont le counting avec attribution et expiration du rôle temporaire. Les
+aperçus du README utilisent uniquement des noms fictifs et la mascotte.
 
 Une partie des fonctions reste à essayer dans Discord : XP vocal avec deux
 humains éligibles, banque, autres jeux, vocaux temporaires, trombinoscope et

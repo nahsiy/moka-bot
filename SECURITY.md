@@ -2,8 +2,9 @@
 
 Pour un incident, utiliser le contact privé du mainteneur du dépôt. Ne jamais
 publier un token, une base, une photo de membre ou des logs contenant des secrets
-dans une issue publique. Le processus de signalement GitHub sera configuré lors
-d'une éventuelle publication ; ce dépôt local n'a pas encore d'URL publique.
+dans une issue publique. Utiliser les moyens de contact privés proposés par
+le mainteneur sur son profil GitHub, sans joindre de secret à une discussion
+publique. Le dépôt public est [nahsiy/moka-bot](https://github.com/nahsiy/moka-bot).
 
 Un token de bot donne un accès technique à l'application : conserver le token
 dans l'environnement, limiter les comptes qui peuvent le lire, le régénérer en
