@@ -21,16 +21,18 @@
 
 1. Sauvegarder la base avec `moka backup`, puis arrêter le bot.
 2. Mettre à jour les sources et lancer `uv sync --locked`.
-3. Vérifier le rôle de pénalité : sous le rôle du bot, dédié et sans permissions
-   globales. Le configurer avec `/config role usage:counting_failure` applique
-   les restrictions aux deux salons de jeu ; configurer les salons si nécessaire.
-4. Le défaut `counting_failure_seconds` passe de 10 800 à 3 600 secondes ; une
+3. Adapter le TOML si nécessaire : le défaut `counting_failure_seconds` passe
+   de 10 800 à 3 600 secondes ; une
    valeur déjà explicite dans votre TOML reste prioritaire. Les pauses actives
    gardent leur échéance. L'amende par défaut est de 1 000 cœurs ; la banque
-   n'est jamais prélevée. `/config comptage amende:0` désactive l'amende.
-5. Pour enregistrer les nouvelles commandes, démarrer une fois avec
+   n'est jamais prélevée.
+4. Pour enregistrer les nouvelles commandes, démarrer une fois avec
    `MOKA_SYNC_COMMANDS=1`, puis revenir à `0`. La synchronisation reste limitée
    aux serveurs explicitement autorisés.
+5. Dans Discord, configurer les deux salons de jeu si nécessaire, puis le rôle
+   avec `/config role usage:counting_failure` : cette action applique les
+   restrictions aux deux salons. Le rôle doit être dédié, sans permissions
+   globales et sous celui du bot. `/config comptage amende:0` désactive l'amende.
 
 Les tables SQLite existantes sont réutilisées. Les données restent locales.
 Les cartes se rendent avec Pillow, sans appel IA à l'exécution. Les exemples
