@@ -4,6 +4,18 @@
 Première recette réelle effectuée sur un serveur de test dédié, avec un seul
 compte humain. La recette complète reste à terminer.
 
+## Validation Linux de la version 0.2.0
+
+Le workflow [GitHub Actions](https://github.com/nahsiy/moka-bot/actions/runs/40549716197)
+réussit sous Python **3.12 et 3.13** : installation verrouillée, Ruff, formatage,
+188 tests, sérialisation des commandes, démonstration hors ligne et construction
+des paquets source et wheel. Ce contrôle ne se connecte pas à Discord.
+
+Les paquets de publication sont contrôlés séparément : illustrations et
+licences embarquées, absence de base, token, capture du client, chemin local
+et identifiant réel dans les fichiers distribués. Les aperçus utilisent la
+mascotte et des noms fictifs. Les sommes SHA-256 accompagnent les téléchargements.
+
 ## Évolution counting — 27 octobre 2026
 
 - **114 tests locaux passent** après intégration des calculs, amendes et pile
@@ -162,7 +174,7 @@ l'exception avant correction et passe après celle-ci.
 
 Le laboratoire tourne localement avec `.env` et `config.test.toml` ; ce n'est
 pas encore un hébergement permanent. Les données et logs ne sont pas versionnés.
-Les captures du client restent privées. Le README présente uniquement des
+Aucune capture du client n'est incluse dans cette version. Le README présente des
 aperçus générés avec des noms fictifs et la mascotte, sans données de membres.
 
 ## Non vérifié ou non exécuté
