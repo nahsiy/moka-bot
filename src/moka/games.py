@@ -19,8 +19,10 @@ def letters(text):
 
 class Games(BaseService):
     def _game_penalty(self, con, guild, user):
+        if penalty := self._all_games_penalty(con, guild, user):
+            return penalty
         grant = con.execute(
-            "SELECT * FROM role_grants WHERE guild=? AND user=? AND reason IN ('counting','words') AND until>? ORDER BY until DESC LIMIT 1",
+            "SELECT * FROM role_grants WHERE guild=? AND user=? AND reason IN ('counting','words','counting-edit') AND until>? ORDER BY until DESC LIMIT 1",
             (guild, user, self.clock()),
         ).fetchone()
         if not grant:
@@ -35,25 +37,25 @@ class Games(BaseService):
     def release_game_penalty(self, guild, user, key):
         def run(con):
             now = self.clock()
+            all_games = self._all_games_penalty(con, guild, user) is not None
             roles = {
                 row["role"]
                 for row in con.execute(
-                    "SELECT role FROM role_grants WHERE guild=? AND user=? AND reason IN ('counting','words')",
+                    "SELECT role FROM role_grants WHERE guild=? AND user=? AND reason IN ('counting','words','counting-edit')",
                     (guild, user),
                 )
             }
-            configured = self.setting(
-                con, guild, "role:counting_failure", self.config.roles.get("counting_failure")
-            )
-            if configured:
-                roles.add(configured)
+            for usage in ("counting_failure", "counting_cheat"):
+                configured = self.setting(con, guild, "role:" + usage, self.config.roles.get(usage))
+                if configured:
+                    roles.add(configured)
             for role in roles:
                 # Une échéance passée laisse la maintenance réessayer un retrait Discord échoué.
                 con.execute(
-                    "INSERT INTO role_grants(guild,user,role,reason,until) VALUES(?,?,?,'counting',?) ON CONFLICT(guild,user,role) DO UPDATE SET until=MIN(role_grants.until,excluded.until) WHERE role_grants.reason IN ('counting','words')",
+                    "INSERT INTO role_grants(guild,user,role,reason,until) VALUES(?,?,?,'counting',?) ON CONFLICT(guild,user,role) DO UPDATE SET until=MIN(role_grants.until,excluded.until) WHERE role_grants.reason IN ('counting','words','counting-edit')",
                     (guild, user, role, now),
                 )
-            return {"roles": sorted(roles), "released_at": now}
+            return {"roles": sorted(roles), "released_at": now, "all_games": all_games}
 
         return self.perform(guild, user, "release-game-penalty", f"unpause:{key}", [], run)
 
@@ -61,7 +63,7 @@ class Games(BaseService):
         role = self.setting(
             con, guild, "role:counting_failure", self.config.roles.get("counting_failure")
         )
-        seconds = self.config.rules.counting_failure_seconds
+        seconds = self.rules_for(guild, con).counting_failure_seconds
         if not role or not seconds:
             return {}
         until = self.clock() + seconds
@@ -108,15 +110,22 @@ class Games(BaseService):
                 "UPDATE games SET score=?, record=MAX(record,?), last_user=?, last_message=? WHERE guild=? AND channel=? AND kind='counting'",
                 (score, score, user if valid else 0, message, guild, channel),
             )
-            reward = fine = 0
+            if valid:
+                self._track_counting(con, guild, channel, user, message, expected)
+            reward = bonus = fine = 0
+            rules = self.rules_for(guild, con)
             economy = self.setting(con, guild, "feature:economy", self.config.features["economy"])
-            if valid and score % self.config.rules.counting_reward_every == 0 and economy:
-                reward = self.credit_prize(
-                    con, guild, user, self.config.rules.counting_reward, "counting"
-                )
-            configured_fine = self.setting(
-                con, guild, "counting:fine", self.config.rules.counting_fine
-            )
+            if valid and score % rules.counting_reward_every == 0 and economy:
+                reward = self.credit_prize(con, guild, user, rules.counting_reward, "counting")
+            if (
+                valid
+                and economy
+                and rules.counting_bonus_chance_bps
+                and self.rng.random() < rules.counting_bonus_chance_bps / 10_000
+            ):
+                draw = self.rng.randint(rules.counting_bonus_min, rules.counting_bonus_max)
+                bonus = self.credit_prize(con, guild, user, draw, "counting-bonus")
+            configured_fine = rules.counting_fine
             if not valid and economy:
                 fine = min(configured_fine, self.account(con, guild, user)["wallet"])
                 if fine:
@@ -127,6 +136,7 @@ class Games(BaseService):
                 "score": score,
                 "expected": expected,
                 "reward": reward,
+                "bonus": bonus,
                 "record": max(state["record"], score),
                 "reason": reason,
                 "fine": fine,
@@ -142,6 +152,7 @@ class Games(BaseService):
     def counting_status(self, guild, channel):
         self.allowed(guild)
         with self.store.read() as con:
+            rules = self.rules_for(guild, con)
             row = con.execute(
                 "SELECT score,record FROM games WHERE guild=? AND channel=? AND kind='counting'",
                 (guild, channel),
@@ -149,7 +160,10 @@ class Games(BaseService):
             return {
                 "next": row["score"] + 1 if row else 1,
                 "record": row["record"] if row else 0,
-                "fine": self.setting(con, guild, "counting:fine", self.config.rules.counting_fine),
+                "fine": rules.counting_fine,
+                "bonus_chance_bps": rules.counting_bonus_chance_bps,
+                "bonus_min": rules.counting_bonus_min,
+                "bonus_max": rules.counting_bonus_max,
             }
 
     def word(self, guild, channel, user, content, message):
@@ -194,7 +208,7 @@ class Games(BaseService):
                     (message, guild, channel),
                 )
                 return {"valid": False, "error": error, **penalty}
-            self.cooldown(con, guild, user, "words", self.config.rules.words_cooldown)
+            self.cooldown(con, guild, user, "words", self.rules_for(guild, con).words_cooldown)
             con.execute("INSERT INTO words VALUES(?,?,?,?)", (guild, channel, state["round"], word))
             score = state["score"] + 1
             con.execute(
@@ -266,7 +280,7 @@ class Games(BaseService):
             )
 
     def start_event(self, guild, channel, user, kind, key, *, difficulty="normal", prepared=False):
-        if kind not in {"goblin", "jackpot", "hack"}:
+        if kind not in {"goblin", "hug", "jackpot", "hack"}:
             raise DomainError("Événement inconnu.")
         if difficulty not in {"easy", "normal", "hard"}:
             raise DomainError("Difficulté inconnue.")
@@ -278,9 +292,10 @@ class Games(BaseService):
             ).fetchone()
             if active:
                 raise DomainError("Un événement de ce type est déjà en cours.")
-            rules = self.config.rules
+            rules = self.rules_for(guild, con)
             seconds = {
                 "goblin": rules.goblin_seconds,
+                "hug": rules.hug_seconds,
                 "jackpot": rules.jackpot_seconds,
                 "hack": 30,
             }[kind]
@@ -291,6 +306,14 @@ class Games(BaseService):
                     "maximum": rules.goblin_max_players,
                     "reward": rules.goblin_reward,
                 }
+            elif kind == "hug":
+                payload = {
+                    "minimum": 1,
+                    "maximum": rules.hug_max_players,
+                    "reward": rules.hug_reward,
+                }
+            elif kind == "jackpot":
+                payload = {"ticket_cost": rules.jackpot_ticket_cost}
             elif kind == "hack":
                 self.cooldown(con, guild, user, "hack", 300)
                 payload = {"difficulty": difficulty, "prepared": prepared}
@@ -308,7 +331,7 @@ class Games(BaseService):
             row = con.execute(
                 "SELECT * FROM events WHERE guild=? AND id=?", (guild, event_id)
             ).fetchone()
-            if not row or row["kind"] not in {"goblin", "jackpot"}:
+            if not row or row["kind"] not in {"goblin", "hug", "jackpot"}:
                 raise DomainError("Cet événement n'accepte pas d'inscription.")
             self.enabled(con, guild, row["kind"])
             if row["status"] != "active" or row["deadline"] <= self.clock():
@@ -320,10 +343,12 @@ class Games(BaseService):
             count = con.execute(
                 "SELECT COUNT(*) FROM participants WHERE event=?", (event_id,)
             ).fetchone()[0]
-            if row["kind"] == "goblin" and count >= json.loads(row["payload"])["maximum"]:
+            if row["kind"] in {"goblin", "hug"} and count >= json.loads(row["payload"])["maximum"]:
                 raise DomainError("Le groupe est complet.")
             if row["kind"] == "jackpot":
-                cost = self.config.rules.jackpot_ticket_cost
+                cost = json.loads(row["payload"]).get("ticket_cost")
+                if cost is None:  # Compatibilité des événements déjà ouverts avant ce champ.
+                    cost = self.rules_for(guild, con).jackpot_ticket_cost
                 self.money(con, guild, user, wallet=-cost, reason="jackpot-ticket")
                 self.add_pot(con, guild, cost)
             con.execute("INSERT INTO participants VALUES(?,?)", (event_id, user))
@@ -352,12 +377,13 @@ class Games(BaseService):
             data = json.loads(event["payload"])
             result = {"kind": event["kind"], "count": len(participants), "reward": 0}
             # Un module désactivé n'efface pas les engagements d'un événement déjà lancé.
-            if event["kind"] == "goblin" and len(participants) >= data["minimum"]:
+            if event["kind"] in {"goblin", "hug"} and len(participants) >= data["minimum"]:
+                reward = data["reward"] * (len(participants) if event["kind"] == "hug" else 1)
                 capped = False
                 for user in participants:
-                    actual = self.credit_prize(con, guild, user, data["reward"], "goblin")
-                    capped |= actual != data["reward"]
-                result["reward"] = data["reward"]
+                    actual = self.credit_prize(con, guild, user, reward, event["kind"])
+                    capped |= actual != reward
+                result["reward"] = reward
                 result["capped"] = capped
             elif event["kind"] == "jackpot" and participants:
                 pot_row = con.execute("SELECT amount FROM pots WHERE guild=?", (guild,)).fetchone()
@@ -406,4 +432,6 @@ class Games(BaseService):
             )
             return result
 
-        return self.perform(guild, user, "hack-finish", key, ["hack", "economy"], run)
+        return self.perform(
+            guild, user, "hack-finish", key, ["hack", "economy"], run, game_exit=abandon
+        )

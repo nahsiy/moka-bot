@@ -75,5 +75,86 @@ async def test_discord_command_is_public_escapes_name_and_never_pings(service, i
     sent = interaction.response.send_message.call_args.kwargs
     assert sent["allowed_mentions"].to_dict() == {"parse": []}
     assert not sent.get("ephemeral", False)
-    assert r"\*\*Camille\*\*" in sent["embed"].description
-    assert sent["embed"].description.endswith((TAUNTS if insult else COMPLIMENTS)[0])
+    assert sent["file"].filename == "moka-attention.png"
+    assert sent["file"].description.endswith((TAUNTS if insult else COMPLIMENTS)[0])
+    assert "embed" not in sent
+
+
+@pytest.mark.parametrize(
+    "article,label",
+    [
+        ("cafe", "café virtuel"),
+        ("biscuit", "biscuit porte-bonheur"),
+        ("trophee", "petit trophée du serveur"),
+    ],
+)
+async def test_purchase_is_private_and_gift_is_public_with_both_members(
+    service, fund, article, label
+):
+    fund(10, 1000)
+    user = Mock(spec=discord.Member)
+    user.id, user.bot = 10, False
+    recipient = Mock(spec=discord.Member)
+    recipient.id, recipient.bot = 20, False
+    bot = SimpleNamespace(service=service)
+    interaction = SimpleNamespace(
+        guild=SimpleNamespace(id=1),
+        user=user,
+        id=123,
+        client=bot,
+        response=SimpleNamespace(send_message=AsyncMock()),
+    )
+    cog = MembersCog(bot)
+    await MembersCog.buy.callback(cog, interaction, article)
+    assert interaction.response.send_message.call_args.kwargs["ephemeral"] is True
+    interaction.id = 124
+    interaction.response.send_message.reset_mock()
+    await MembersCog.give_item.callback(cog, interaction, recipient, article)
+    sent = interaction.response.send_message.call_args
+    assert not sent.kwargs.get("ephemeral", False)
+    assert not sent.args and "content" not in sent.kwargs
+    assert sent.kwargs["embed"].title == "🎁 Un cadeau !"
+    assert sent.kwargs["embed"].description == f"<@10> offre un **{label}** à <@20>."
+    assert sent.kwargs["allowed_mentions"].to_dict() == {"parse": []}
+    assert service.inventory(1, 10) == []
+    assert service.inventory(1, 20) == [{"item": article, "quantity": 1}]
+
+
+async def test_failed_gift_does_not_publish_a_success(service):
+    user = Mock(spec=discord.Member)
+    user.id, user.bot = 10, False
+    recipient = Mock(spec=discord.Member)
+    recipient.id, recipient.bot = 20, False
+    interaction = SimpleNamespace(
+        guild=SimpleNamespace(id=1),
+        user=user,
+        id=123,
+        client=SimpleNamespace(service=service),
+        response=SimpleNamespace(send_message=AsyncMock()),
+    )
+    with pytest.raises(DomainError, match="possèdes pas"):
+        await MembersCog.give_item.callback(
+            MembersCog(interaction.client), interaction, recipient, "cafe"
+        )
+    interaction.response.send_message.assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    "draw,rarity,pool",
+    [
+        (0.59, "classic", COMPLIMENTS[:30]),
+        (0.60, "rare", COMPLIMENTS[30:42]),
+        (0.90, "epic", COMPLIMENTS[42:]),
+    ],
+)
+def test_rarity_selects_distinct_phrases_and_remains_replay_safe(service, draw, rarity, pool):
+    service.rng.value = draw
+    result = service.social_message(1, 10, "draw", "compliment")
+    assert result["rarity"] == rarity and result["text"] in pool
+    assert service.social_message(1, 10, "draw", "compliment")["text"] == result["text"]
+    recent = []
+    for i in range(10):
+        service.clock.advance(15)
+        result = service.social_message(1, 10, f"next:{i}", "compliment")
+        assert result["text"] not in recent[-5:]
+        recent.append(result["text"])

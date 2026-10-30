@@ -19,12 +19,18 @@ class Community(BaseService):
             setting_key = "fun:recent:" + kind
             recent = self.setting(con, guild, setting_key, [])
             recent = [line for line in recent if line in catalog][-5:]
-            text = self.rng.choice([line for line in catalog if line not in recent])
-            con.execute(
-                "INSERT INTO settings VALUES(?,?,?) ON CONFLICT(guild,key) DO UPDATE SET value=excluded.value",
-                (guild, setting_key, json.dumps((recent + [text])[-5:])),
+            draw = self.rng.random()
+            rarity = "classic" if draw < 0.60 else "rare" if draw < 0.90 else "epic"
+            pool = (
+                catalog[:30]
+                if rarity == "classic"
+                else catalog[30:42]
+                if rarity == "rare"
+                else catalog[42:]
             )
-            return {"text": text, "kind": kind}
+            text = self.rng.choice([line for line in pool if line not in recent])
+            self._set_setting(con, guild, setting_key, (recent + [text])[-5:])
+            return {"text": text, "kind": kind, "rarity": rarity}
 
         return self.perform(guild, user, "fun", key, ["fun"], run)
 
@@ -106,10 +112,9 @@ class Community(BaseService):
         with self.store.transaction() as con:
             self.enabled(con, guild, "trombi")
             account = self.account(con, guild, user)
-            if level(account["xp"]) < self.config.rules.trombi_min_level:
-                raise DomainError(
-                    f"Le trombinoscope demande le niveau {self.config.rules.trombi_min_level}."
-                )
+            minimum = self.rules_for(guild, con).trombi_min_level
+            if level(account["xp"]) < minimum:
+                raise DomainError(f"Le trombinoscope demande le niveau {minimum}.")
             con.execute(
                 "INSERT OR IGNORE INTO photos(guild,user,message) VALUES(?,?,?)",
                 (guild, user, message),
@@ -162,7 +167,12 @@ class Community(BaseService):
         self.allowed(guild)
         tables = (
             "accounts",
+            "admissions",
+            "presence",
+            "counting_validations",
             "inventory",
+            "collections",
+            "profile_titles",
             "cooldowns",
             "ledger",
             "role_grants",
@@ -193,7 +203,18 @@ class Community(BaseService):
                 raise DomainError(
                     "Termine tes événements et tickets, retire tes photos et attends l'expiration de tes rôles temporaires avant l'effacement."
                 )
-            for table in ("accounts", "inventory", "cooldowns", "ledger", "tickets", "photos"):
+            for table in (
+                "accounts",
+                "inventory",
+                "collections",
+                "profile_titles",
+                "cooldowns",
+                "ledger",
+                "tickets",
+                "photos",
+                "presence",
+                "counting_validations",
+            ):
                 con.execute(f"DELETE FROM {table} WHERE guild=? AND user=?", (guild, user))
             # Garde seulement un marqueur anonyme contre le rejeu d'une ancienne
             # interaction. Ni identité ni ancien résultat dans ce marqueur.

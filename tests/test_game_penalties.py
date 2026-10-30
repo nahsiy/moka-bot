@@ -83,7 +83,7 @@ async def test_penalty_blocks_admin_like_messages_without_xp_or_fine(service, fu
         reply=AsyncMock(),
     )
     await bot.on_message(message)
-    assert "pause" in message.reply.call_args.args[0]
+    assert "pause" in message.reply.call_args.kwargs["embed"].description
     message.add_reaction.assert_not_awaited()
     assert service.profile(1, 10, viewer=10)["xp"] == 0
     assert service.profile(1, 10, viewer=10)["wallet"] == 4000
@@ -110,7 +110,7 @@ async def test_word_error_applies_role_immediately_and_does_not_repeat(service):
     await bot.on_message(message)
     community.apply_role_grant.assert_awaited_once()
     message.add_reaction.assert_awaited_once_with("❌")
-    assert "<@&99>" in message.reply.call_args.args[0]
+    assert "<@&99>" in message.reply.call_args.kwargs["embed"].description
     await bot.on_message(message)
     assert message.reply.await_count == 1
     await bot.close()

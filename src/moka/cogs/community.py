@@ -11,6 +11,14 @@ from discord.ext import commands
 from moka.base import DomainError
 from moka.cogs.staff import staff
 from moka.discord_ui import SafeView, card, context
+from moka.role_panels import (
+    CategoryPicker,
+    category_menu,
+    prepare_preferences,
+    protected_roles,
+    publish_categories,
+    validate_choices,
+)
 
 log = logging.getLogger(__name__)
 PRIVILEGES = (
@@ -36,7 +44,8 @@ PRIVILEGES = (
 
 
 class RoleSelect(discord.ui.Select):
-    def __init__(self, member, menu):
+    def __init__(self, member, menu, *, category=None):
+        self.category = category
         options = []
         for role_id, group in menu.items():
             role = member.guild.get_role(int(role_id))
@@ -51,8 +60,12 @@ class RoleSelect(discord.ui.Select):
                 )
         if not options:
             raise DomainError("Aucun rôle disponible. Le staff doit configurer /config role_choix.")
+        exclusive = len(set(menu.values())) == 1 and all(menu.values())
         super().__init__(
-            placeholder="Choisir mes rôles", min_values=0, max_values=len(options), options=options
+            placeholder="Choisir mes rôles",
+            min_values=0,
+            max_values=1 if exclusive else len(options),
+            options=options,
         )
         self.owner = member.id
 
@@ -61,29 +74,13 @@ class RoleSelect(discord.ui.Select):
         if user != self.owner:
             raise DomainError("Ce menu appartient à un autre membre.")
         cog = interaction.client.get_cog("CommunityCog")
-        if not cog.service.is_enabled(guild, "roles"):
-            raise DomainError("Les rôles à choisir sont désactivés.")
-        # Relecture de l'allowlist au clic : un ancien menu n'accorde aucun droit retiré.
-        menu = cog.service.get_setting(guild, "role_menu", {})
         selected = set(self.values)
-        if not selected <= menu.keys():
-            raise DomainError("Le menu a changé. Rouvre /roles choisir.")
-        groups = [menu[key] for key in selected if menu[key]]
-        if len(groups) != len(set(groups)):
-            raise DomainError("Choisis un seul rôle dans chaque groupe exclusif.")
+        validate_choices(cog.service, guild, self.category, selected)
         await interaction.response.defer(ephemeral=True)
-        member = await interaction.guild.fetch_member(user)
-        roles = [interaction.guild.get_role(int(key)) for key in menu]
-        for role in roles:
-            if role:
-                cog.safe_role(interaction.guild, role)
-        add = [r for r in roles if r and str(r.id) in selected and r not in member.roles]
-        remove = [r for r in roles if r and str(r.id) not in selected and r in member.roles]
-        if remove:
-            await member.remove_roles(*remove, reason="Moka : choix des rôles")
-        if add:
-            await member.add_roles(*add, reason="Moka : choix des rôles")
-        await interaction.edit_original_response(content="Tes rôles sont mis à jour.", view=None)
+        await cog.apply_role_preferences(interaction, self.category, selected)
+        await interaction.edit_original_response(
+            content=None, embed=card("☕ Tes préférences", "Tes rôles sont mis à jour."), view=None
+        )
 
 
 class RolePanelView(SafeView):
@@ -147,10 +144,16 @@ class PhotoReviewView(SafeView):
         user = cog.service.review_photo(guild, row["message"], approve=approve)
         await cog.sync_photo_role(interaction.guild, user)
         await interaction.message.edit(
-            content="Photo approuvée." if approve else "Photo refusée : aucun accès accordé.",
+            content=None,
+            embed=card(
+                "📸 Trombinoscope",
+                "Photo approuvée." if approve else "Photo refusée : aucun accès accordé.",
+            ),
             view=None,
         )
-        await interaction.followup.send("Décision enregistrée.", ephemeral=True)
+        await interaction.followup.send(
+            embed=card("📸 Trombinoscope", "Décision enregistrée."), ephemeral=True
+        )
 
     @discord.ui.button(
         label="Approuver", style=discord.ButtonStyle.success, custom_id="moka:photo:approve"
@@ -188,15 +191,51 @@ class CommunityCog(commands.Cog):
         if not guild.me or role >= guild.me.top_role:
             raise DomainError("Place le rôle de Moka au-dessus du rôle à attribuer.")
 
-    async def choose_roles(self, interaction):
+    def safe_self_role(self, guild, role):
+        self.safe_role(guild, role)
+        if role.id in protected_roles(self.service, guild.id) or role.name == "☕ Le Barista":
+            raise DomainError(
+                "Les rôles du staff, de progression et de pause ne sont pas à choisir."
+            )
+
+    async def apply_role_preferences(self, interaction, category, selected):
+        guild, user, _ = context(interaction)
+        validate_choices(self.service, guild, category, selected)
+        lock = self.role_locks.setdefault((guild, user), asyncio.Lock())
+        async with lock:
+            member = await interaction.guild.fetch_member(user)
+            # Même contrôle après l'attente : une fenêtre ancienne ne rétablit aucun choix retiré.
+            menu = validate_choices(self.service, guild, category, selected)
+            roles = [interaction.guild.get_role(int(key)) for key in menu]
+            for role in roles:
+                if role:
+                    self.safe_self_role(interaction.guild, role)
+            add = [r for r in roles if r and str(r.id) in selected and r not in member.roles]
+            remove = [r for r in roles if r and str(r.id) not in selected and r in member.roles]
+            if add:
+                await member.add_roles(*add, reason="Moka : choix des rôles")
+            if remove:
+                await member.remove_roles(*remove, reason="Moka : choix des rôles")
+            return [r.name for r in roles if r and str(r.id) in selected]
+
+    async def choose_roles(self, interaction, category=None):
         guild, _, _ = context(interaction)
         if not self.service.is_enabled(guild, "roles"):
             raise DomainError("Le choix de rôles est désactivé.")
-        menu = self.service.get_setting(guild, "role_menu", {})
         view = SafeView(timeout=120)
-        view.add_item(RoleSelect(interaction.user, menu))
+        categories = self.service.get_setting(guild, "role_categories", {})
+        if category is None and categories:
+            view.add_item(CategoryPicker(interaction.user.id, categories))
+            text = "Choisis une rubrique. Tu pourras ajouter ou retirer tes préférences."
+        else:
+            menu = category_menu(self.service, guild, category)
+            view.add_item(RoleSelect(interaction.user, menu, category=category))
+            text = "Sélectionne tes préférences. Pour tout retirer dans cette rubrique, valide sans sélection."
         await interaction.response.send_message(
-            "Sélectionne les rôles que tu souhaites conserver parmi les choix proposés.",
+            embed=card(
+                "☕ Fais comme chez toi",
+                text,
+            ),
             view=view,
             ephemeral=True,
         )
@@ -213,6 +252,16 @@ class CommunityCog(commands.Cog):
         guild, _, _ = staff(interaction)
         if not self.service.is_enabled(guild, "roles"):
             raise DomainError("Le module de rôles est désactivé.")
+        if self.service.get_setting(guild, "role_categories", {}):
+            if not isinstance(interaction.channel, discord.TextChannel):
+                raise DomainError("Publie le panneau dans un salon textuel.")
+            await interaction.response.defer(ephemeral=True)
+            count = await publish_categories(interaction.channel, self.service)
+            await interaction.followup.send(
+                embed=card("☕ Le coin des rôles", f"{count} rubriques publiées ou actualisées."),
+                ephemeral=True,
+            )
+            return
         await interaction.response.send_message(
             embed=card(
                 "🎭 À chacun ses préférences",
@@ -221,18 +270,36 @@ class CommunityCog(commands.Cog):
             view=RolePanelView(),
         )
 
+    @roles.command(
+        name="installer", description="Préparer les préférences facultatives du Comptoir"
+    )
+    @app_commands.default_permissions(manage_guild=True)
+    async def install_roles(self, interaction: discord.Interaction):
+        guild, _, _ = staff(interaction)
+        if not self.service.is_enabled(guild, "roles"):
+            raise DomainError("Le module de rôles est désactivé.")
+        await interaction.response.defer(ephemeral=True)
+        categories = await prepare_preferences(
+            interaction.guild, interaction.guild.me, self.service
+        )
+        await interaction.followup.send(
+            embed=card(
+                "☕ Le coin des rôles",
+                f"{len(categories)} rubriques prêtes. Utilise /roles publier dans le salon de ton choix.",
+            ),
+            ephemeral=True,
+        )
+
     @roles.command(name="niveaux", description="Récupérer les rôles de niveau déjà mérités")
     async def level_roles(self, interaction: discord.Interaction):
         guild, user, _ = context(interaction)
         if not self.service.is_enabled(guild, "roles"):
             raise DomainError("Le module de rôles est désactivé.")
         await interaction.response.defer(ephemeral=True)
-        profile = self.service.profile(guild, user, viewer=user)
-        await self.bot.level_roles(
-            interaction.user, {"level": profile["level"], "previous_level": -1}
-        )
+        await self.bot.level_roles(interaction.user)
         await interaction.followup.send(
-            "Tes récompenses de rôle ont été vérifiées.", ephemeral=True
+            embed=card("🏅 Récompenses de niveau", "Tes récompenses de rôle ont été vérifiées."),
+            ephemeral=True,
         )
 
     async def open_ticket(self, interaction):
@@ -257,7 +324,8 @@ class CommunityCog(commands.Cog):
             existing = interaction.guild.get_channel(ticket["channel"] or 0)
             if existing:
                 await interaction.followup.send(
-                    f"Ton ticket est déjà ouvert : {existing.mention}", ephemeral=True
+                    embed=card("📬 Ton ticket", f"Ton ticket est déjà ouvert : {existing.mention}"),
+                    ephemeral=True,
                 )
                 return
             # Récupération d'une création interrompue juste avant l'écriture SQLite.
@@ -271,7 +339,9 @@ class CommunityCog(commands.Cog):
             )
             if existing:
                 self.service.bind_ticket(guild_id, ticket["id"], existing.id)
-                await interaction.followup.send(f"Ton ticket : {existing.mention}", ephemeral=True)
+                await interaction.followup.send(
+                    embed=card("📬 Ton ticket", f"Ton ticket : {existing.mention}"), ephemeral=True
+                )
                 return
             if ticket["status"] == "open":
                 self.service.close_ticket(guild_id, ticket["channel"])
@@ -313,9 +383,14 @@ class CommunityCog(commands.Cog):
                 raise
             self.service.bind_ticket(guild_id, ticket["id"], channel.id)
             await channel.send(
-                "📬 Ton ticket est ouvert. Explique ta demande au staff.\nUn seul ticket ouvert par personne. /ticket fermer termine l'échange sans supprimer les messages."
+                embed=card(
+                    "📬 Ton ticket",
+                    "📬 Ton ticket est ouvert. Explique ta demande au staff.\nUn seul ticket ouvert par personne. /ticket fermer termine l'échange sans supprimer les messages.",
+                )
             )
-            await interaction.followup.send(f"Ton ticket : {channel.mention}", ephemeral=True)
+            await interaction.followup.send(
+                embed=card("📬 Ton ticket", f"Ton ticket : {channel.mention}"), ephemeral=True
+            )
 
     @ticket_group.command(name="ouvrir", description="Ouvrir un ticket privé avec le staff")
     async def ticket_open(self, interaction: discord.Interaction):
@@ -366,7 +441,10 @@ class CommunityCog(commands.Cog):
         )
         self.service.close_ticket(guild, interaction.channel_id)
         await interaction.followup.send(
-            "Ticket fermé. L'historique reste dans ce salon ; aucun transcript n'est exporté.",
+            embed=card(
+                "📬 Ticket fermé",
+                "L'historique reste dans ce salon ; aucun transcript n'est exporté.",
+            ),
             ephemeral=True,
         )
 
@@ -377,7 +455,9 @@ class CommunityCog(commands.Cog):
         self.bot.voice_eligible = {
             v for v in self.bot.voice_eligible if v[:2] != (member.guild.id, member.id)
         }
-        if not self.service.is_enabled(member.guild.id, "temporary_voice"):
+        if not self.service.admitted(member.guild.id, member.id) or not self.service.is_enabled(
+            member.guild.id, "temporary_voice"
+        ):
             return
         creator = self.bot.channel_id(member.guild.id, "voice_creator")
         if after.channel and after.channel.id == creator and before.channel != after.channel:
@@ -438,7 +518,9 @@ class CommunityCog(commands.Cog):
         room = await self.owned_room(interaction)
         await interaction.response.defer(ephemeral=True)
         await room.edit(name=nom, reason="Moka : demande du propriétaire")
-        await interaction.followup.send("Salon renommé.", ephemeral=True)
+        await interaction.followup.send(
+            embed=card("🔊 Ton salon vocal", "Salon renommé."), ephemeral=True
+        )
 
     @vocal.command(
         name="limite", description="Définir la capacité de ton salon, 0 signifie sans limite"
@@ -449,7 +531,9 @@ class CommunityCog(commands.Cog):
         room = await self.owned_room(interaction)
         await interaction.response.defer(ephemeral=True)
         await room.edit(user_limit=places, reason="Moka : capacité demandée par le propriétaire")
-        await interaction.followup.send("Capacité mise à jour.", ephemeral=True)
+        await interaction.followup.send(
+            embed=card("🔊 Ton salon vocal", "Capacité mise à jour."), ephemeral=True
+        )
 
     async def submit_photo(self, message):
         guild, user = message.guild.id, message.author.id
@@ -457,14 +541,18 @@ class CommunityCog(commands.Cog):
         access = self.bot.role_id(guild, "trombi_access")
         if not {preaccess, access}.intersection(role.id for role in message.author.roles):
             await message.reply(
-                "Demande d'abord le pré-accès au staff par ticket.", mention_author=False
+                embed=card("📸 Trombinoscope", "Demande d'abord le pré-accès au staff par ticket."),
+                mention_author=False,
             )
             return
         if not any(
             a.content_type and a.content_type.startswith("image/") for a in message.attachments
         ):
             await message.reply(
-                "Chaque publication doit contenir une image. Les échanges peuvent se faire dans un fil.",
+                embed=card(
+                    "📸 Trombinoscope",
+                    "Chaque publication doit contenir une image. Les échanges peuvent se faire dans un fil.",
+                ),
                 mention_author=False,
             )
             return
@@ -474,7 +562,10 @@ class CommunityCog(commands.Cog):
             raise DomainError("Le salon de validation du trombinoscope n'est pas configuré.")
         # Le panneau ne recopie ni ne télécharge l'image.
         response = await review.send(
-            f"Photo à vérifier de <@{user}> : [ouvrir l'original]({message.jump_url})",
+            embed=card(
+                "📸 Trombinoscope",
+                f"Photo à vérifier de <@{user}> : [ouvrir l'original]({message.jump_url})",
+            ),
             view=PhotoReviewView(),
         )
         with self.bot.store.transaction() as con:
@@ -535,8 +626,17 @@ class CommunityCog(commands.Cog):
         if user and guild:
             await self.sync_photo_role(guild, user)
 
-    async def configure_game_role(self, guild, role):
+    def safe_game_role(self, guild, role, usage):
         self.safe_role(guild, role)
+        if role.permissions.value or role.id in protected_roles(
+            self.service, guild.id, exclude_usage=usage
+        ):
+            raise DomainError(
+                "Choisis un rôle de pause dédié, sans permission et distinct des autres usages."
+            )
+
+    async def configure_game_role(self, guild, role, *, usage="counting_failure"):
+        self.safe_game_role(guild, role, usage)
         if not role.hoist:
             await role.edit(hoist=True, reason="Moka : afficher séparément le rôle de pause")
         for usage in ("counting", "words"):
@@ -569,7 +669,7 @@ class CommunityCog(commands.Cog):
         for role_id in roles:
             with self.bot.store.read() as con:
                 grant = con.execute(
-                    "SELECT * FROM role_grants WHERE guild=? AND user=? AND role=? AND reason IN ('counting','words') AND until<=?",
+                    "SELECT * FROM role_grants WHERE guild=? AND user=? AND role=? AND reason IN ('counting','words','counting-edit') AND until<=?",
                     (guild.id, user, role_id, self.service.clock()),
                 ).fetchone()
             if grant:
@@ -579,7 +679,7 @@ class CommunityCog(commands.Cog):
                     log.exception("Retrait du rôle de jeu différé ; la maintenance réessaiera")
         with self.bot.store.read() as con:
             pending = con.execute(
-                "SELECT 1 FROM role_grants WHERE guild=? AND user=? AND reason IN ('counting','words') AND until<=?",
+                "SELECT 1 FROM role_grants WHERE guild=? AND user=? AND reason IN ('counting','words','counting-edit') AND until<=?",
                 (guild.id, user, self.service.clock()),
             ).fetchone()
         return bool(pending)
@@ -607,8 +707,16 @@ class CommunityCog(commands.Cog):
                     (guild.id, grant["user"], grant["role"], now),
                 )
         elif not grant["applied"] or role not in member.roles:
-            self.safe_role(guild, role)
-            await member.add_roles(role, reason="Moka : erreur dans un jeu")
+            if grant["reason"] == "counting-edit":
+                self.safe_game_role(guild, role, "counting_cheat")
+            else:
+                self.safe_role(guild, role)
+            await member.add_roles(
+                role,
+                reason="Moka : modification après validation"
+                if grant["reason"] == "counting-edit"
+                else "Moka : erreur dans un jeu",
+            )
             with self.bot.store.transaction() as con:
                 con.execute(
                     "UPDATE role_grants SET applied=1 WHERE guild=? AND user=? AND role=?",

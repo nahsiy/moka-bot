@@ -1,5 +1,45 @@
 # Historique des versions
 
+## 0.3.0 — 30 octobre 2026
+
+Le Comptoir prend vie : accueil, personnalisation, outils du staff et musique partagée.
+
+### Fonctions
+
+- Accueil privé sur entretien à partir de 21 ans, charte séparée et validation humaine.
+- Rôles au choix par rubriques, paliers XP du Comptoir, suivi des pauses et absences annoncées.
+- Profil privé illustré, opérations bancaires directes, récompenses, historique,
+  boutique, inventaire, huit badges et quatre titres décoratifs.
+- Tableau privé du Barista : modules et règles métier persistées par serveur.
+- Tournée de Moka et câlin collectif avec cartes originales et boutons persistants.
+- Counting : bonus surprise et corvée de vaisselle après modification d’un nombre validé.
+- Compliments et taquineries illustrés en trois éditions ; catalogue bienveillant.
+- Juke-box partagé : lecteur, file, votes et vocal d’écoute sans micro ni XP passif.
+
+### Nettoyage avant release
+
+- Chargement des commandes partagé entre le bot et sa vérification hors ligne.
+- Écritures de configuration centralisées et lecture des règles dans la transaction métier.
+- Tarif du jackpot conservé pour toute la durée des nouvelles animations.
+- Gestion commune de la propriété et de l’expiration des écrans privés du profil.
+- Guides alignés sur le panneau Barista, les cartes sociales et les prérequis musicaux.
+- FFmpeg et Deno embarqués dans Docker ; contrôle du conteneur ajouté à la CI.
+
+### Mise à jour depuis 0.2.0
+
+1. Sauvegarder la base et arrêter l’instance avant de remplacer les sources.
+2. Synchroniser les dépendances verrouillées avec `uv sync --locked` ; installer
+   FFmpeg et Deno pour le Juke-box en installation Python, ou reconstruire l’image.
+3. Conserver la configuration et les données locales. Les tables sont ajoutées
+   sans effacer les comptes ; les anciens réglages d’amende/corvée restent lus.
+4. Resynchroniser une fois les commandes sur les seuls serveurs autorisés, puis
+   remettre `MOKA_SYNC_COMMANDS=0`. Installer accueil et Juke-box explicitement.
+5. Les sanctions et événements en cours gardent leur état. Les anciens jackpots
+   sans tarif enregistré gardent le comportement historique ; les nouveaux figent leur prix.
+   La file musicale repart vide après un redémarrage.
+
+La validation actuelle et ses limites figurent dans [VALIDATION.md](docs/VALIDATION.md).
+
 ## 0.2.0 — 27 octobre 2026
 
 ### Nouveautés

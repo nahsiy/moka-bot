@@ -5,6 +5,8 @@ from __future__ import annotations
 import discord
 
 LAB_NAME = "Moka • Laboratoire"
+PENALTY_ROLE_NAME = "☕ Café renversé"
+PENALTY_ROLE_COLOUR = 0xBC8053
 
 
 async def prepare(guild, bot_member, service, *, expected_name=LAB_NAME):
@@ -21,30 +23,48 @@ async def prepare(guild, bot_member, service, *, expected_name=LAB_NAME):
     result = {"guild": guild.id, "roles": {}, "channels": {}}
     for name in (
         "Staff test",
-        "Pas-doué",
+        PENALTY_ROLE_NAME,
         "Lecteur",
         "MP ouverts",
         "MP sur demande",
         "MP fermés",
     ):
         role = next((r for r in roles if r.name == name and not r.managed), None)
-        if role is None and name == "Pas-doué":
-            role = next((r for r in roles if r.name == "Pas doué (test)" and not r.managed), None)
-            if role:
-                role = await role.edit(name="Pas-doué", reason="Moka : rôle de pause des jeux")
+        if role is None and name == PENALTY_ROLE_NAME:
+            configured = service.get_setting(guild.id, "role:counting_failure")
+            role = next((r for r in roles if r.id == configured and not r.managed), None)
+            if role is None:
+                role = next(
+                    (
+                        r
+                        for r in roles
+                        if r.name in {"Pas-doué", "Pas doué (test)"} and not r.managed
+                    ),
+                    None,
+                )
         if role is None:
             role = await guild.create_role(
                 name=name,
                 permissions=discord.Permissions.none(),
-                hoist=name == "Pas-doué",
+                hoist=name == PENALTY_ROLE_NAME,
+                colour=discord.Colour(PENALTY_ROLE_COLOUR if name == PENALTY_ROLE_NAME else 0),
                 reason="Moka : préparation du laboratoire",
             )
             roles.append(role)
         # Même une relance ne récupère pas silencieusement un rôle privilégié.
         if role.permissions.value:
             raise ValueError(f"Le rôle de laboratoire {name} doit être sans permissions globales")
-        if name == "Pas-doué" and not role.hoist:
-            role = await role.edit(hoist=True, reason="Moka : afficher le groupe de pause")
+        if name == PENALTY_ROLE_NAME and (
+            role.name != name or not role.hoist or role.colour.value != PENALTY_ROLE_COLOUR
+        ):
+            old_role = role
+            role = await role.edit(
+                name=name,
+                colour=discord.Colour(PENALTY_ROLE_COLOUR),
+                hoist=True,
+                reason="Moka : pause café commune aux jeux",
+            )
+            roles[roles.index(old_role)] = role
         result["roles"][name] = role.id
 
     channels = await guild.fetch_channels()
@@ -101,6 +121,15 @@ async def prepare(guild, bot_member, service, *, expected_name=LAB_NAME):
                 name, category=parent, overwrites=parent.overwrites, reason="Moka : laboratoire"
             )
             channels.append(channel)
+        if usage == "logs":
+            # Un salon existant peut avoir des droits distincts de sa catégorie.
+            staff_role = next(r for r in roles if r.id == result["roles"]["Staff test"])
+            overwrite = channel.overwrites_for(staff_role)
+            overwrite.view_channel = True
+            overwrite.read_message_history = True
+            await channel.set_permissions(
+                staff_role, overwrite=overwrite, reason="Moka : accès du staff au journal"
+            )
         service.set_setting(guild.id, "channel:" + usage, channel.id)
         result["channels"][usage] = channel.id
 
@@ -128,8 +157,8 @@ async def prepare(guild, bot_member, service, *, expected_name=LAB_NAME):
     ):
         service.set_setting(guild.id, "channel:" + usage, channel_id)
         result["channels"][usage] = channel_id
-    service.set_setting(guild.id, "role:counting_failure", result["roles"]["Pas-doué"])
-    penalty_role = next(r for r in roles if r.id == result["roles"]["Pas-doué"])
+    service.set_setting(guild.id, "role:counting_failure", result["roles"][PENALTY_ROLE_NAME])
+    penalty_role = next(r for r in roles if r.id == result["roles"][PENALTY_ROLE_NAME])
     for usage in ("counting", "words"):
         channel = next(c for c in channels if c.id == result["channels"][usage])
         overwrite = channel.overwrites_for(penalty_role)

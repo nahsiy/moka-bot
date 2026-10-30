@@ -4,12 +4,12 @@ Un compagnon Discord francophone : discussions, progression et petites
 animations pour faire vivre une communauté. Python 3.12+, SQLite, modules
 activables séparément. Aucun service payant ni modèle IA requis.
 
-**Version 0.2.0 : jeux de salon enrichis, cartes illustrées et 188 tests locaux
-réussis.** Counting avec calculs et pile ou face, pause commune aux deux jeux,
-déblocage par le staff, 14 taux et duos illustrés, 100 compliments et taquineries.
-Plusieurs parcours ont été essayés dans un laboratoire Discord ; l'XP vocal à
-deux personnes et la recette complète restent à valider :
-[détail des vérifications](docs/VALIDATION.md).
+**Moka 0.3.0 — Le Comptoir prend vie.** Accueil sur entretien, rôles au choix,
+profil et banque, badges et titres, panneau du Barista, cartes originales et
+Juke-box partagé. Les [notes de version](docs/RELEASE-0.3.0.md) présentent les
+nouveautés et la mise à jour depuis 0.2.0.
+Les tests locaux et les parcours réellement essayés dans Discord sont détaillés
+séparément dans [VALIDATION.md](docs/VALIDATION.md).
 
 Moka peut servir de base commune : code Python modifiable, licence MIT et
 hébergement au choix de l'équipe. Chaque module peut être activé séparément,
@@ -32,7 +32,7 @@ fixes jusqu'à minuit à Paris, avec avatars et illustrations partiellement
 colorées. Les pseudos grecs, cyrilliques et les emojis sont pris en charge.
 
 Le counting accepte les calculs et tire à pile ou face après une erreur, avec
-une amende configurable : [règles](docs/COUNTING.md). Le rôle **Pas-doué** impose
+une amende configurable : [règles](docs/COUNTING.md). Le rôle **☕ Café renversé** impose
 une pause d'une heure dans les deux jeux ; le staff la lève avec
 `/debloquer membre` : [détails](docs/GAME-PENALTIES.md).
 
@@ -44,18 +44,19 @@ ci-dessous.
 
 | Module | Fonctions |
 | --- | --- |
-| Progression | XP écrit et vocal, niveaux, profils, classement, rôles de niveau |
+| Progression | XP écrit et vocal, niveaux, profils, classement, [six paliers de rôles](docs/ROLES-XP.md) avec rattrapage automatique |
 | Économie | Cœurs fictifs, récompenses 24 h / 7 j, cadeaux, portefeuille |
 | Banque | Dépôts, retraits, capacité, intérêts, amélioration de la protection |
 | Distractions | Paris, jackpot collectif, vol de portefeuille, mini-jeu de hack |
-| Gobelin | Groupe limité, compte à rebours, récompense collective, apparitions optionnelles |
+| [Tournée de Moka](docs/TOURNEE.md) | Pause café illustrée, inscriptions, compte à rebours et récompense collective |
 | Jeux de salon | Counting avec calculs, amende et pile ou face, record, rôle d'erreur temporaire ; suite de mots avec deux modes |
-| Ambiance | 50 compliments et 50 taquineries bienveillantes, cinq dernières phrases évitées, horoscope fictif |
+| Ambiance | 50 compliments et 50 taquineries illustrés, trois éditions, cinq dernières phrases évitées, horoscope fictif |
 | Taux du jour | 8 taux individuels et 6 duos, cartes illustrées avec avatars, résultats fixes jusqu'à minuit |
-| Boutique | Objets décoratifs en cœurs, inventaire et cadeaux ; aucune gemme |
-| Communauté | Rôles à choisir, tickets privés, salons vocaux temporaires |
+| Boutique et souvenirs | Objets à offrir, 8 badges et 4 titres décoratifs ; achats privés, aucune gemme |
+| [Le Juke-box](docs/JUKEBOX.md) | File partagée, lecteur illustré, commandes dans un salon dédié et écoute vocale sans micros |
+| Communauté | Accueil privé sur entretien, rôles à choisir, pauses annoncées, tickets et vocaux temporaires |
 | Trombinoscope | Pré-accès, niveau minimum, approbation du staff, retrait d'accès après suppression |
-| Administration | Configuration, diagnostic, correction journalisée des cœurs, timeout manuel |
+| Administration | Panneau privé du Barista, règles par serveur, diagnostic, correction journalisée des cœurs, timeout manuel |
 | Données | Profil privé, export personnel, effacement confirmé, sauvegarde cohérente |
 
 Le catalogue et les textes sont originaux. Les montants, probabilités et règles
@@ -77,7 +78,7 @@ uv run pytest -q
 
 `check` construit et sérialise réellement l'arbre des commandes Discord, sans
 token ni requête réseau. `demo` joue un scénario dans une base SQLite jetable :
-récompenses, banque, achat, cadeau, counting, gobelin et sauvegarde. Ce scénario
+récompenses, banque, achat, cadeau, counting, tournée collective et sauvegarde. Ce scénario
 ne charge aucun membre Discord et ne crée aucun salon.
 
 ## Installer sur un serveur de test
@@ -94,10 +95,16 @@ liste de serveurs autorisés.
 
 ```text
 src/moka/
-  base.py          Comptes, reçus, XP, transactions et configuration persistée
+  base.py          Comptes, reçus, XP et transactions
+  settings.py      Règles et activation des modules par serveur
   economy.py       Banque, boutique, cadeaux, paris et vols
   games.py         Counting, mots, événements et règlements
   community.py     Tickets, photos et tirages des phrases d'ambiance
+  admission*.py    Accueil privé, charte et accès sur entretien
+  presence.py      Participation observée et absences annoncées
+  collection.py    Badges, titres et historique des cœurs
+  profile_*.py     Cartes, navigation privée et durée de vie des écrans
+  music*.py        Sources, file, lecteur et installation du Juke-box
   social_catalog.py  50 compliments et 50 taquineries originales
   rates.py         Pourcentages quotidiens individuels et en duo
   rate_cards.py    Rendu local des cartes, avatars et emojis
@@ -109,7 +116,9 @@ tests/             Tests métier, concurrence et frontière Discord
 ```
 
 - [Exploitation et sauvegardes](docs/EXPLOITATION.md)
+- [Identité visuelle et présentation des réponses](docs/DIRECTION-ARTISTIQUE.md)
 - [État de validation et recette Discord](docs/VALIDATION.md)
+- [Revue de nettoyage avant release](docs/NETTOYAGE.md)
 - [Taux du jour, duos et illustrations](docs/RATES.md)
 - [Compliments et taquineries](docs/AMBIANCE.md)
 - [Changements et mise à jour](CHANGELOG.md)
@@ -138,3 +147,16 @@ aucun dashboard web, port entrant, Redis ou PostgreSQL n'est nécessaire.
 Les aperçus et la démonstration CLI sont produits hors ligne. Ils ne prouvent
 pas le fonctionnement de tous les modules dans Discord. Les essais réels sont
 décrits séparément dans [VALIDATION.md](docs/VALIDATION.md).
+
+Le [premier café](docs/ACCUEIL.md) propose un accueil privé sur entretien, avec
+charte et validation humaine avant les accès communautaires. Il reste désactivé
+par défaut et demande une installation explicite.
+
+Le [câlin collectif](docs/CALIN-COLLECTIF.md) rejoint les choix de
+`/animation lancer` : une pause facultative, illustrée et gratuite, avec des
+cœurs fictifs selon le nombre de participants.
+
+Le [tableau du Barista](docs/BARISTA.md) regroupe les réglages du serveur. Le
+[profil et les souvenirs](docs/PROFIL-ET-SOUVENIRS.md) donnent accès à la banque,
+aux récompenses, à la boutique et aux badges. [Le Juke-box](docs/JUKEBOX.md) propose
+une écoute partagée, avec son lecteur et sa file, dans deux espaces dédiés.

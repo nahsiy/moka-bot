@@ -14,11 +14,10 @@ class Economy(BaseService):
     def claim(self, guild, user, key, period="daily"):
         if period not in {"daily", "weekly"}:
             raise DomainError("Récompense inconnue.")
-        amount = (
-            self.config.rules.daily_coins if period == "daily" else self.config.rules.weekly_coins
-        )
 
         def run(con):
+            rules = self.rules_for(guild, con)
+            amount = rules.daily_coins if period == "daily" else rules.weekly_coins
             self.cooldown(con, guild, user, period, 86400 if period == "daily" else 604800)
             self.money(con, guild, user, wallet=amount, reason=period)
             return {"amount": amount}
@@ -42,7 +41,7 @@ class Economy(BaseService):
 
         def run(con):
             account = self.account(con, guild, user)
-            if deposit and account["bank"] + amount > self.capacity(account):
+            if deposit and account["bank"] + amount > self.capacity(account, con):
                 raise DomainError("La capacité de ta banque est insuffisante.")
             self.money(
                 con,
@@ -58,7 +57,7 @@ class Economy(BaseService):
             guild, user, "deposit" if deposit else "withdraw", key, ["economy", "bank"], run
         )
 
-    def bank_upgrade(self, guild, user, key, kind="capacity"):
+    def bank_upgrade(self, guild, user, key, kind="capacity", *, expected_tier=None):
         columns = {
             "capacity": "bank_tier",
             "interest": "interest_tier",
@@ -68,20 +67,22 @@ class Economy(BaseService):
             raise DomainError("Amélioration inconnue.")
 
         def run(con):
+            rules = self.rules_for(guild, con)
             account = self.account(con, guild, user)
             column = columns[kind]
             tier = account[column]
+            if expected_tier is not None and tier != expected_tier:
+                raise DomainError("Le palier a changé. Actualise ton profil avant de réessayer.")
             if (
                 tier >= 20
                 or (
                     kind == "interest"
-                    and self.config.rules.bank_interest_bps * (tier + 1)
-                    >= self.config.rules.bank_interest_max_bps
+                    and rules.bank_interest_bps * (tier + 1) >= rules.bank_interest_max_bps
                 )
                 or (kind == "protection" and tier >= 5)
             ):
                 raise DomainError("Amélioration maximale déjà atteinte.")
-            cost = self.config.rules.bank_upgrade_cost * (tier + 1)
+            cost = rules.bank_upgrade_cost * (tier + 1)
             self.money(con, guild, user, wallet=-cost, reason="bank-upgrade")
             con.execute(
                 f"UPDATE accounts SET {column}={column}+1 WHERE guild=? AND user=?", (guild, user)
@@ -92,10 +93,11 @@ class Economy(BaseService):
 
     def interest(self, guild, user, key):
         def run(con):
+            rules = self.rules_for(guild, con)
             account = self.account(con, guild, user)
             rate = min(
-                self.config.rules.bank_interest_max_bps,
-                self.config.rules.bank_interest_bps * (account["interest_tier"] + 1),
+                rules.bank_interest_max_bps,
+                rules.bank_interest_bps * (account["interest_tier"] + 1),
             )
             amount = account["bank"] * rate // 10000
             if amount == 0:
@@ -141,8 +143,9 @@ class Economy(BaseService):
             raise DomainError("Tu ne peux pas te voler toi-même.")
 
         def run(con):
+            rules = self.rules_for(guild, con)
             thief, victim = self.account(con, guild, user), self.account(con, guild, target)
-            minimum = self.config.rules.robbery_min_wallet
+            minimum = rules.robbery_min_wallet
             if min(thief["wallet"], victim["wallet"]) < minimum:
                 raise DomainError(
                     f"Les deux portefeuilles doivent contenir au moins {minimum} cœurs."
@@ -153,20 +156,18 @@ class Economy(BaseService):
             ).fetchone()
             if shield and shield[0] > self.clock():
                 raise DomainError("Cette cible bénéficie d'une protection temporaire.")
-            self.cooldown(con, guild, user, "robbery", self.config.rules.robbery_cooldown)
+            self.cooldown(con, guild, user, "robbery", rules.robbery_cooldown)
             chance = max(0.10, 0.55 - victim["protection_tier"] * 0.08)
             win = self.rng.random() < chance
             if win:
                 amount = min(
                     victim["wallet"],
-                    self.config.rules.robbery_max_loot,
+                    rules.robbery_max_loot,
                     max(1, victim["wallet"] * self.rng.randint(5, 20) // 100),
                 )
                 self.money(con, guild, target, wallet=-amount, reason="robbery-loss")
                 self.money(con, guild, user, wallet=amount, reason="robbery-gain")
-                self.cooldown(
-                    con, guild, target, "robbed", self.config.rules.robbery_protection_seconds
-                )
+                self.cooldown(con, guild, target, "robbed", rules.robbery_protection_seconds)
             else:
                 amount = min(thief["wallet"], max(1, thief["wallet"] // 10))
                 self.money(con, guild, user, wallet=-amount, reason="robbery-fine")

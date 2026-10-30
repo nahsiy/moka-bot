@@ -41,8 +41,12 @@ licences OFL sont livrées dans `src/moka/assets/fonts/`. Noto Color Emoji
 emojis des pseudos, dont les feuilles décoratives, les variantes de peau et les
 séquences jointes. La troncature préserve ces séquences.
 
-Chaque carte de 1 360 × 600 pixels contient l'avatar, le nom, le pourcentage,
+Chaque carte de 1 200 × 900 pixels contient l'avatar, le nom, le pourcentage,
 une jauge, l'illustration qui se colore du bas vers le haut et un commentaire.
+Le format compact et l'illustration agrandie améliorent la lecture dans le fil.
+La carte est envoyée seule en pièce jointe, sans bloc texte redondant. Sa
+description accessible reprend les noms, le taux, le commentaire et l'heure
+de renouvellement ; elle n'est plus intégrée dans un encart réduit.
 Les noms trop longs sont raccourcis. Un avatar indisponible est remplacé par
 une initiale ; si la carte ne peut pas être produite, le texte du résultat
 reste disponible dans Discord. La génération des cartes se fait localement

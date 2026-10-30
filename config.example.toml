@@ -10,9 +10,12 @@ jackpot = true
 robbery = true
 hack = true
 goblin = true
+hug = true
 counting = true
 words = true
 fun = true
+collection = true
+music = true
 rates = true
 horoscope = true
 shop = true
@@ -36,14 +39,24 @@ bank_interest_bps = 100
 bank_interest_max_bps = 500
 # Pause commune au counting et à la suite de mots ; 0 désactive les nouvelles pauses.
 counting_failure_seconds = 3600
+# Modification du nombre après validation : pause de tous les jeux.
+counting_cheat_seconds = 3600
 # Amende sur le portefeuille ; 0 la désactive. Réglable aussi par /config comptage.
 counting_fine = 1000
+# Bonus surprise : 500 points de base = 5 % ; 0 désactive le tirage.
+counting_bonus_chance_bps = 500
+counting_bonus_min = 10
+counting_bonus_max = 50
 goblin_seconds = 60
 goblin_min_players = 3
 goblin_max_players = 20
 goblin_reward = 100
 # 0 : pas de publication automatique. Essayer d'abord /animation lancer.
 goblin_interval_minutes = 0
+# Câlin collectif : chacun reçoit hug_reward × le nombre de participants.
+hug_seconds = 60
+hug_max_players = 20
+hug_reward = 200
 jackpot_ticket_cost = 100
 jackpot_seconds = 300
 trombi_min_level = 50
@@ -59,3 +72,4 @@ mode = "free"
 
 [roles]
 # counting_failure = 123456789012345680
+# counting_cheat = 123456789012345681

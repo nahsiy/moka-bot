@@ -25,3 +25,19 @@ jobs:
       - run: uv run moka --config config.example.toml check
       - run: uv run moka demo
       - run: uv build
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t moka:validation .
+      - name: Vérifier le conteneur sans token ni connexion Discord
+        run: |
+          docker run --rm --read-only --tmpfs /tmp:size=64m,mode=1777 \
+            --entrypoint sh moka:validation -ec '
+              test "$(id -u)" = 10001
+              deno --version
+              ffmpeg -version
+              python -m yt_dlp --version
+              moka --config /app/config.toml check
+              moka demo
+            '

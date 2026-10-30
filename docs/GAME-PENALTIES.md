@@ -2,7 +2,7 @@
 
 ## Comportement
 
-Une erreur dans le counting ou la suite de mots donne le rôle **Pas-doué**
+Une erreur dans le counting ou la suite de mots donne le rôle **☕ Café renversé**
 pendant **une heure**. La personne peut lire les salons, mais ne peut plus
 écrire dans les deux salons de jeux. Les autres salons restent accessibles.
 Le rôle est affiché séparément dans la liste des membres pour rendre la pause visible.
@@ -34,15 +34,21 @@ dans `config.test.toml`. Sans rôle configuré, ou si la durée vaut zéro, les
 nouvelles pauses sont désactivées. Une pause déjà enregistrée reste valable
 jusqu'à son échéance même si le réglage est changé ou le rôle retiré à la main.
 
-Le nom historique du rôle de laboratoire `Pas doué (test)` est repris et
-renommé `Pas-doué` sans changer son identifiant. Un laboratoire neuf crée ce
-rôle directement.
+Le rôle de laboratoire devient **☕ Café renversé**, en caramel café `#BC8053`,
+affiché séparément. Les anciens noms `Pas-doué` et `Pas doué (test)`, ou le rôle
+déjà configuré, sont repris sans changer leur identifiant ni leurs permissions.
+Un laboratoire neuf crée directement le nouveau rôle. Le changement de nom
+ne renouvelle pas les pauses en cours.
+
+La première erreur affiche « Oups, café renversé ! Moka passe un coup d’éponge. »,
+le rôle et l’heure de retour. Pendant la pause, le message devient « Le comptoir
+sèche encore. ». La durée reste configurable ; le texte indique l’échéance réelle.
 
 ## Reprise et limites
 
 Le staff peut lever la sanction avant l'échéance avec **`/debloquer membre`**.
 La permission Gérer le serveur est vérifiée à l'exécution ; la réponse est
-privée et l'action figure dans le journal du staff. Le rôle Pas-doué est retiré
+privée et l'action figure dans le journal du staff. Le rôle Café renversé est retiré
 et la pause des deux jeux levée, sans modifier les soldes, la partie ou les
 autres rôles. La commande fonctionne aussi pour un rôle de pénalité attribué
 manuellement. Une même interaction rejouée ne lève pas une sanction plus récente.
@@ -62,3 +68,7 @@ maintenance. Une panne de Discord peut retarder l'attribution ou le retrait.
 Un membre absent du cache est recherché auprès de Discord. Une absence ou un
 rôle supprimé ne doit pas supprimer prématurément la pause. Le record, la
 chaîne et les autres données de jeu ne sont pas effacés par une suspension.
+
+## Corvée distincte pour les modifications
+
+La [corvée de vaisselle](CORVEE.md) couvre un nombre de counting validé puis altéré. Son rôle `counting_cheat` et sa durée sont distincts du Café renversé ; elle bloque tous les jeux. Les deux pauses peuvent coexister et `/debloquer` les lève ensemble.

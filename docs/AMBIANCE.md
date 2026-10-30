@@ -19,7 +19,10 @@ Exemples :
 
 ## Tirage et limites
 
-Le hasard choisit parmi les phrases qui ne figurent pas dans les **cinq derniers
+Le hasard tire d’abord une édition : **La petite attention** (60 %),
+**La perle du Comptoir** (30 %) ou **La pépite de Moka** (10 %). Le catalogue
+de chaque catégorie est réparti en 30, 12 et 8 phrases. Dans cette édition,
+il choisit parmi les phrases qui ne figurent pas dans les **cinq derniers
 résultats de la même catégorie sur le serveur**, tous auteurs et cibles confondus.
 Chaque catégorie a son propre historique, conservé après redémarrage. Il ne
 contient que les phrases du catalogue, sans identifiant de cible.
@@ -29,7 +32,8 @@ Un reçu rejoué ne tire pas une nouvelle phrase et ne fait pas avancer
 l'historique. Aucun cœur ni XP n'est crédité ou prélevé par ces commandes.
 
 La réponse est publique dans le salon de la commande, mais ne déclenche aucun
-ping. Les caractères Markdown du pseudo sont échappés. Le staff peut désactiver
+ping. Une carte originale affiche la phrase, le pseudo et l’édition, avec une
+description accessible et sans texte recopié au-dessus. Le staff peut désactiver
 ces deux commandes avec `/config module nom:fun actif:false`.
 
 ## Étendre les phrases

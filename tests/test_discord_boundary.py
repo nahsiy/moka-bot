@@ -141,7 +141,11 @@ def test_forged_event_message_is_rejected(service):
     i.client.user = SimpleNamespace(id=999)
     i.message = SimpleNamespace(
         author=SimpleNamespace(id=998),
-        embeds=[event_embed(service.get_event(1, event["event_id"]), service)],
+        embeds=[
+            event_embed(service.get_event(1, event["event_id"]), service).set_footer(
+                text="Moka · " + event["event_id"]
+            )
+        ],
         channel=SimpleNamespace(id=5),
         id=555,
     )
@@ -229,7 +233,7 @@ async def test_counting_staff_setting_checks_permission_and_persists(service):
     i.user.guild_permissions = discord.Permissions(manage_guild=True)
     await StaffCog.counting_rules.callback(cog, i, 75)
     assert service.counting_status(1, 5)["fine"] == 75
-    assert "Prochain nombre" in i.response.send_message.call_args.args[0]
+    assert "Prochain nombre" in i.response.send_message.call_args.kwargs["embed"].description
     assert i.response.send_message.call_args.kwargs["ephemeral"]
 
 
@@ -253,7 +257,7 @@ async def test_counting_discord_replies_and_replay(service, fund, draw, coin, ne
     )
     await bot.on_message(message)
     message.add_reaction.assert_awaited_once_with("❌")
-    response = message.reply.call_args.args[0]
+    response = message.reply.call_args.kwargs["embed"].description
     assert coin in response and "1000 ❤️" in response
     assert f"**{next_number}**" in response
     assert message.reply.call_args.kwargs["mention_author"] is False

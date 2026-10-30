@@ -24,6 +24,7 @@ idéalement rattachée à une équipe Discord avec des responsables durables.
 | Vocaux temporaires | Gérer les salons, voir/connecter, déplacer les membres |
 | Trombinoscope | Lire le salon, gérer les rôles, créer et utiliser des fils publics |
 | Timeout | Exclure temporairement des membres ; hiérarchies staff/bot vérifiées |
+| Juke-box | Gérer les salons à l’installation ; voir/connecter/parler pour Moka dans le vocal dédié, sans permission de capture audio |
 | Export personnel | Joindre des fichiers dans les réponses |
 
 Les permissions effectives de chaque salon peuvent restreindre celles du rôle.
@@ -72,24 +73,29 @@ Avec un compte disposant de Gérer le serveur :
 /config salon usage:words salon:#suite-de-mots
 /config salon usage:logs salon:#journal-moka
 /config salon usage:goblin salon:#distractions
-/config role usage:counting_failure role:@Pas-doué
+/config role usage:counting_failure role:@☕ Café renversé
 /config comptage amende:1000
 /config suite_mots mode:free
 ```
 
 Ces noms sont des exemples à créer sur le serveur de test. Ne pas activer deux
 bots de counting ou d'XP dans le même salon pendant un essai de transition.
-Les montants et délais sont dans `[rules]` du TOML ; ils demandent un redémarrage.
-L'amende de counting peut être changée immédiatement par `/config comptage` ;
+Les montants et délais de départ sont dans `[rules]` du TOML. Le panneau privé
+`/barista` les modifie immédiatement pour ce serveur et les conserve dans SQLite ;
+ces valeurs priment ensuite sur le TOML. Le plafond général de monnaie reste
+configuré dans TOML avec redémarrage.
+L'amende de counting peut aussi être changée par `/config comptage` ;
 `amende:0` la désactive. Voir les [règles de counting](COUNTING.md).
 Le rôle `counting_failure` est commun aux deux jeux : sa configuration bloque
 l'écriture dans leurs deux salons pendant la pause. La durée par défaut est
 d'une heure, y compris dans le laboratoire : [détails](GAME-PENALTIES.md).
 Les commandes `/config` persistent les choix de salons/rôles/modules dans SQLite
-et prennent le dessus sur le TOML pour ces choix.
+et prennent le dessus sur le TOML pour ces choix. Voir [le tableau du Barista](BARISTA.md).
 
-Pour les menus : `/config role_choix`, puis `/roles publier`. Un nom de groupe
-exclusif identique permet un seul choix parmi ses rôles (exemple : MP).
+Pour les préférences du Comptoir : `/roles installer`, puis `/roles publier` dans
+le salon souhaité. Pour personnaliser : `/config role_choix` avec une `rubrique`.
+Un nom de groupe exclusif identique permet un seul choix parmi ses rôles (exemple : MP).
+Voir [les rôles à choisir](ROLES-A-CHOISIR.md).
 
 Pour les tickets : configurer `/config equipe_tickets`, éventuellement le
 `ticket_category`, puis `/ticket publier`. Les administrateurs Discord peuvent
@@ -105,6 +111,14 @@ uniquement par le staff. Les droits du pré-accès et de l'accès complet sont �
 configurer explicitement sur les salons. Seuls les membres autorisés par ces
 rôles peuvent y soumettre une image. Pas d'accès automatique par simple message.
 
+## Musique
+
+Le Juke-box demande FFmpeg et Deno 2.3 minimum dans PATH, en plus des dépendances
+Python voix déjà verrouillées. Le conteneur les embarque. En installation Python,
+installer ces deux exécutables depuis leurs sources officielles, puis ouvrir
+`/config jukebox` avec la permission Gérer le serveur. Aucun cookie personnel.
+Voir [le fonctionnement et les limites](JUKEBOX.md).
+
 ## Nouveautés et mise à jour
 
 `/taux` et `/duo` utilisent le module `rates`, actif par défaut, et rendent les
@@ -114,7 +128,8 @@ embarquées ; aucun service IA ni clé supplémentaire n'est nécessaire.
 [comportement](AMBIANCE.md). Les commandes peuvent s'utiliser dans un salon de
 distractions, sans configuration d'identifiant supplémentaire.
 
-Pour passer de 0.1.0 à 0.2.0, suivre [le guide de mise à jour](../CHANGELOG.md).
+Pour passer de 0.2.0 à 0.3.0, suivre [les notes de version](RELEASE-0.3.0.md).
+Les étapes de la mise à jour 0.1.0 → 0.2.0 restent dans [le changelog](../CHANGELOG.md).
 Sauvegarder la base et resynchroniser une fois les commandes dans les seuls
 serveurs autorisés. Les pauses actives gardent leur échéance.
 
@@ -131,5 +146,7 @@ privilèges, un système de fichiers applicatif en lecture seule et un volume
 persistant `/data`. `.env` est lu au démarrage ; le TOML d'exemple est monté en
 lecture seule et peut être remplacé par votre configuration.
 
-**Le build Docker n'a pas été exécuté pendant cette livraison : le moteur
-Docker local était arrêté.** Valider l'image avant tout hébergement durable.
+Le build et l’exécution Linux ARM64 sont vérifiés localement, y compris Deno,
+FFmpeg, la démo et le rendu des cartes en lecture seule. Une source YouTube a été
+résolue et décodée dans le conteneur, sans connexion Discord. Le job CI complète
+la vérification hors ligne sur son runner ; voir [le périmètre exact](NETTOYAGE.md).

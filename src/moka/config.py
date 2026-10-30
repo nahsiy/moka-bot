@@ -15,6 +15,7 @@ FEATURES = frozenset(
         "robbery",
         "hack",
         "goblin",
+        "hug",
         "counting",
         "words",
         "fun",
@@ -26,6 +27,8 @@ FEATURES = frozenset(
         "temporary_voice",
         "trombi",
         "moderation",
+        "collection",
+        "music",
     }
 )
 CHANNELS = frozenset(
@@ -41,9 +44,11 @@ CHANNELS = frozenset(
         "voice_category",
         "trombi",
         "trombi_review",
+        "music_text",
+        "music_voice",
     }
 )
-ROLES = frozenset({"counting_failure", "trombi_preaccess", "trombi_access"})
+ROLES = frozenset({"counting_failure", "counting_cheat", "trombi_preaccess", "trombi_access"})
 
 
 @dataclass(frozen=True)
@@ -66,14 +71,21 @@ class Rules:
     robbery_protection_seconds: int = 1800
     counting_reward_every: int = 100
     counting_reward: int = 100
+    counting_bonus_chance_bps: int = 500
+    counting_bonus_min: int = 10
+    counting_bonus_max: int = 50
     counting_fine: int = 1000
     counting_failure_seconds: int = 3600
+    counting_cheat_seconds: int = 3600
     words_cooldown: int = 10
     goblin_seconds: int = 60
     goblin_min_players: int = 3
     goblin_max_players: int = 20
     goblin_reward: int = 100
     goblin_interval_minutes: int = 0
+    hug_seconds: int = 60
+    hug_max_players: int = 20
+    hug_reward: int = 200
     jackpot_ticket_cost: int = 100
     jackpot_seconds: int = 300
     trombi_min_level: int = 50
@@ -87,9 +99,13 @@ class Rules:
         for name in (
             "message_cooldown",
             "counting_reward_every",
+            "counting_bonus_min",
+            "counting_bonus_max",
             "goblin_seconds",
             "goblin_min_players",
             "goblin_max_players",
+            "hug_seconds",
+            "hug_max_players",
             "jackpot_ticket_cost",
             "jackpot_seconds",
             "max_amount",
@@ -98,6 +114,10 @@ class Rules:
                 raise ValueError(f"{name} doit être positif")
         if not 0 < self.bank_interest_bps <= self.bank_interest_max_bps <= 1000:
             raise ValueError("Intérêts : 0 < taux initial <= taux maximum <= 1000 points de base")
+        if self.counting_bonus_chance_bps > 10_000:
+            raise ValueError("Counting : chance du bonus entre 0 et 10 000 points de base")
+        if self.counting_bonus_min > self.counting_bonus_max:
+            raise ValueError("Counting : bonus minimum supérieur au maximum")
         if self.goblin_min_players > self.goblin_max_players:
             raise ValueError("Gobelin : minimum supérieur au maximum")
 

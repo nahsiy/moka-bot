@@ -13,6 +13,7 @@ from discord.ext import commands
 from moka.base import DomainError
 from moka.discord_ui import ForgetView, HackView, card, context, event_embed, human
 from moka.economy import CATALOG
+from moka.profile_ui import send_profile
 
 
 class MembersCog(commands.Cog):
@@ -24,22 +25,7 @@ class MembersCog(commands.Cog):
         self.bot, self.service = bot, bot.service
 
     async def show_profile(self, interaction, member=None):
-        guild, user, _ = context(interaction)
-        target = member or interaction.user
-        profile = self.service.profile(guild, human(target), viewer=user)
-        embed = card(
-            f"☕ Profil de {target.display_name}",
-            f"Niveau **{profile['level']}** · **{profile['xp']:,}/{profile['next_xp']:,} XP**",
-        )
-        embed.add_field(name="Portefeuille", value=f"{profile['wallet']:,} ❤️")
-        embed.add_field(name="Banque", value=f"{profile['bank']:,}/{profile['capacity']:,} ❤️")
-        embed.add_field(
-            name="Participation comptabilisée",
-            value=f"{profile['messages']} messages · {profile['voice_minutes']} minutes vocales",
-            inline=False,
-        )
-        embed.set_footer(text="Monnaie fictive · /confidentialite pour masquer ton profil")
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await send_profile(interaction, member)
 
     @app_commands.command(name="profile", description="Ton profil, tes niveaux et tes cœurs")
     async def profile(self, interaction: discord.Interaction, membre: discord.Member | None = None):
@@ -86,7 +72,8 @@ class MembersCog(commands.Cog):
         guild, user, key = context(interaction)
         result = self.service.claim(guild, user, key)
         await interaction.response.send_message(
-            f"Ton café du jour : **+{result['amount']} ❤️**.", ephemeral=True
+            embed=card("☕ Récompense du jour", f"Ton café du jour : **+{result['amount']} ❤️**."),
+            ephemeral=True,
         )
 
     @argent.command(name="hebdomadaire", description="Récupérer ta récompense tous les sept jours")
@@ -94,7 +81,11 @@ class MembersCog(commands.Cog):
         guild, user, key = context(interaction)
         result = self.service.claim(guild, user, key, "weekly")
         await interaction.response.send_message(
-            f"Récompense de la semaine : **+{result['amount']} ❤️**.", ephemeral=True
+            embed=card(
+                "🎉 Récompense de la semaine",
+                f"Récompense de la semaine : **+{result['amount']} ❤️**.",
+            ),
+            ephemeral=True,
         )
 
     @banque.command(name="deposer", description="Déposer des cœurs dans ta banque")
@@ -103,7 +94,9 @@ class MembersCog(commands.Cog):
     ):
         guild, user, key = context(interaction)
         self.service.bank_move(guild, user, montant, key)
-        await interaction.response.send_message(f"**{montant:,} ❤️** déposés.", ephemeral=True)
+        await interaction.response.send_message(
+            embed=card("🏦 Dépôt en banque", f"**{montant:,} ❤️** déposés."), ephemeral=True
+        )
 
     @banque.command(name="retirer", description="Retirer des cœurs de ta banque")
     async def withdraw(
@@ -111,7 +104,9 @@ class MembersCog(commands.Cog):
     ):
         guild, user, key = context(interaction)
         self.service.bank_move(guild, user, montant, key, deposit=False)
-        await interaction.response.send_message(f"**{montant:,} ❤️** retirés.", ephemeral=True)
+        await interaction.response.send_message(
+            embed=card("🏦 Retrait de la banque", f"**{montant:,} ❤️** retirés."), ephemeral=True
+        )
 
     @banque.command(
         name="ameliorer", description="Augmenter la capacité, les intérêts ou la protection"
@@ -124,7 +119,10 @@ class MembersCog(commands.Cog):
         guild, user, key = context(interaction)
         result = self.service.bank_upgrade(guild, user, key, amelioration)
         await interaction.response.send_message(
-            f"Amélioration **{amelioration}**, palier **{result['tier']}** : **{result['cost']} ❤️** dépensés.",
+            embed=card(
+                "🏦 Banque améliorée",
+                f"Amélioration **{amelioration}**, palier **{result['tier']}** : **{result['cost']} ❤️** dépensés.",
+            ),
             ephemeral=True,
         )
 
@@ -133,7 +131,10 @@ class MembersCog(commands.Cog):
         guild, user, key = context(interaction)
         result = self.service.interest(guild, user, key)
         await interaction.response.send_message(
-            f"Intérêts : **+{result['amount']} ❤️** ({result['rate_bps'] / 100:g} %).",
+            embed=card(
+                "🏦 Tes intérêts",
+                f"Intérêts : **+{result['amount']} ❤️** ({result['rate_bps'] / 100:g} %).",
+            ),
             ephemeral=True,
         )
 
@@ -147,7 +148,8 @@ class MembersCog(commands.Cog):
         guild, user, key = context(interaction)
         self.service.transfer(guild, user, human(membre), montant, key)
         await interaction.response.send_message(
-            f"Tu offres **{montant:,} ❤️** à {membre.display_name}.", ephemeral=True
+            embed=card("❤️ Cœurs offerts", f"Tu offres **{montant:,} ❤️** à {membre.display_name}."),
+            ephemeral=True,
         )
 
     @app_commands.command(
@@ -196,7 +198,7 @@ class MembersCog(commands.Cog):
                 if not m.bot
                 and m.id != user
                 and self.service.profile(guild, m.id, viewer=m.id)["wallet"]
-                >= self.bot.config.rules.robbery_min_wallet
+                >= self.service.rules_for(guild).robbery_min_wallet
             ]
             if not candidates:
                 raise DomainError("Aucune cible éligible dans les membres disponibles.")
@@ -229,7 +231,8 @@ class MembersCog(commands.Cog):
         event = self.service.get_event(guild, result["event_id"])
         if result["replayed"] and event["message"]:
             await interaction.response.send_message(
-                "Cette opération a déjà été ouverte.", ephemeral=True
+                embed=card("💻 Opération virtuelle", "Cette opération a déjà été ouverte."),
+                ephemeral=True,
             )
             return
         await interaction.response.send_message(
@@ -242,21 +245,11 @@ class MembersCog(commands.Cog):
         name="boutique", description="Les petits objets disponibles en cœurs, sans gemmes"
     )
     async def shop(self, interaction: discord.Interaction):
-        guild, _, _ = context(interaction)
-        if not self.service.is_enabled(guild, "shop"):
-            raise DomainError("La boutique est désactivée.")
-        text = "\n".join(
-            f"**{item['name']}** · {item['price']} ❤️ · identifiant `{key}`"
-            for key, item in CATALOG.items()
-        )
-        await interaction.response.send_message(
-            embed=card(
-                "🛍️ La petite boutique",
-                text
-                + "\n\n/acheter pour commander, /offrir pour faire un cadeau.\nObjets décoratifs, sans effet sur les probabilités.",
-            ),
-            ephemeral=True,
-        )
+        from moka.profile_hub import show_hub
+
+        context(interaction)
+        await interaction.response.defer(ephemeral=True)
+        await show_hub(interaction, "shop")
 
     @app_commands.command(name="acheter", description="Acheter un objet de la boutique")
     async def buy(
@@ -265,21 +258,20 @@ class MembersCog(commands.Cog):
         guild, user, key = context(interaction)
         result = self.service.buy(guild, user, article, key)
         await interaction.response.send_message(
-            f"**{result['name']}** ajouté à ton inventaire pour **{result['price']} ❤️**.",
+            embed=card(
+                "🛍️ Achat confirmé",
+                f"**{result['name']}** ajouté à ton inventaire pour **{result['price']} ❤️**.",
+            ),
             ephemeral=True,
         )
 
     @app_commands.command(name="inventaire", description="Voir tes objets de la boutique")
     async def inventory(self, interaction: discord.Interaction):
-        guild, user, _ = context(interaction)
-        rows = self.service.inventory(guild, user)
-        text = "\n".join(
-            f"{CATALOG.get(row['item'], {}).get('name', row['item'])} × **{row['quantity']}**"
-            for row in rows
-        )
-        await interaction.response.send_message(
-            embed=card("🎒 Ton inventaire", text or "Ton sac est encore vide."), ephemeral=True
-        )
+        from moka.profile_hub import show_hub
+
+        context(interaction)
+        await interaction.response.defer(ephemeral=True)
+        await show_hub(interaction, "inventory")
 
     @app_commands.command(name="offrir", description="Offrir un objet de ton inventaire")
     async def give_item(
@@ -289,9 +281,13 @@ class MembersCog(commands.Cog):
         article: Literal["cafe", "biscuit", "trophee"],
     ):
         guild, user, key = context(interaction)
-        self.service.give_item(guild, user, human(membre), article, key)
+        result = self.service.give_item(guild, user, human(membre), article, key)
         await interaction.response.send_message(
-            f"Tu offres **{CATALOG[article]['name']}** à {membre.display_name}.", ephemeral=True
+            embed=card(
+                "🎁 Un cadeau !",
+                f"<@{user}> offre un **{CATALOG[result['item']]['name'].lower()}** à <@{result['target']}>.",
+            ),
+            allowed_mentions=discord.AllowedMentions.none(),
         )
 
     async def fun(self, interaction, member, insult):
@@ -299,10 +295,16 @@ class MembersCog(commands.Cog):
         target = member or interaction.user
         human(target)
         result = self.service.social_message(guild, user, key, "taunt" if insult else "compliment")
+        import asyncio
+
+        from moka.social_cards import RARITIES, render_social_card
+
+        image = await asyncio.to_thread(render_social_card, target.display_name, result)
         await interaction.response.send_message(
-            embed=card(
-                "🙃 Petite taquinerie" if insult else "🌟 Un compliment",
-                f"**{discord.utils.escape_markdown(target.display_name)}**\n\n{result['text']}",
+            file=discord.File(
+                io.BytesIO(image),
+                filename="moka-attention.png",
+                description=f"{'Taquinerie' if insult else 'Compliment'} pour {target.display_name}. {RARITIES[result['rarity']][0]}. {result['text']}",
             ),
             allowed_mentions=discord.AllowedMentions.none(),
         )
@@ -365,9 +367,12 @@ class MembersCog(commands.Cog):
         guild, user, _ = context(interaction)
         self.service.set_privacy(guild, user, prive)
         await interaction.response.send_message(
-            "Ton profil est privé."
-            if prive
-            else "Ton profil peut apparaître dans les classements.",
+            embed=card(
+                "🔒 Confidentialité",
+                "Ton profil est privé."
+                if prive
+                else "Ton profil peut apparaître dans les classements.",
+            ),
             ephemeral=True,
         )
 
@@ -375,22 +380,27 @@ class MembersCog(commands.Cog):
         name="mes_donnees", description="Exporter les données locales de ton compte"
     )
     async def export_data(self, interaction: discord.Interaction):
-        guild, user, _ = context(interaction)
+        guild, user, _ = context(interaction, allow_pending=True)
         await interaction.response.defer(ephemeral=True)
         content = json.dumps(
             self.service.export_user(guild, user), ensure_ascii=False, indent=2
         ).encode()
         await interaction.followup.send(
-            file=discord.File(io.BytesIO(content), filename="mes-donnees-moka.json"), ephemeral=True
+            embed=card("📦 Tes données", "Ton export personnel est joint à cette réponse privée."),
+            file=discord.File(io.BytesIO(content), filename="mes-donnees-moka.json"),
+            ephemeral=True,
         )
 
     @app_commands.command(
         name="oublier", description="Demander l'effacement de tes données locales"
     )
     async def forget(self, interaction: discord.Interaction):
-        _, user, _ = context(interaction)
+        _, user, _ = context(interaction, allow_pending=True)
         await interaction.response.send_message(
-            "L'effacement retire ton XP, tes cœurs et ton inventaire. Il est définitif dans la base active. Les sauvegardes suivent leur durée de conservation. Confirmer ?",
+            embed=card(
+                "🗑️ Effacement des données",
+                "L'effacement retire ton XP, tes cœurs et ton inventaire. Il est définitif dans la base active. Les sauvegardes suivent leur durée de conservation. L'état d'accueil nécessaire aux accès reste conservé tant que tu es membre. Confirmer ?",
+            ),
             view=ForgetView(user),
             ephemeral=True,
         )
@@ -402,8 +412,8 @@ class MembersCog(commands.Cog):
             name for name in self.bot.config.features if self.service.is_enabled(guild, name)
         )
         text = (
-            "**Progression** : /profile · /xp consulter · /xp classement\n**Économie** : /argent · /banque · /donner\n**Distractions** : /parier · /voler · /hack · /jackpot\n**Objets** : /boutique · /acheter · /inventaire · /offrir\n**Ambiance** : /compliment · /insulter · /horoscope\n**Taux du jour** : /taux · /duo\n**Communauté** : /ticket · /roles · /vocal\n**Données** : /confidentialite · /mes_donnees · /oublier\n**Staff** : /config · /animation · /moderation · /debloquer · /diagnostic\n\nModules activés : "
-            + ", ".join(enabled)
+            "**Progression** : /profile · /xp consulter · /xp classement\n**Économie** : /argent · /banque · /donner\n**Distractions** : /parier · /voler · /hack · /jackpot\n**Objets** : /boutique · /acheter · /inventaire · /offrir\n**Ambiance** : /compliment · /insulter · /horoscope\n**Taux du jour** : /taux · /duo\n**Communauté** : /ticket · /roles · /vocal · /absence · /retour\n**Données** : /confidentialite · /mes_donnees · /oublier\n**Staff** : /config · /animation · /moderation · /debloquer · /diagnostic · /activite bilan\n\nModules activés : "
+            + ", ".join("tournée de Moka" if name == "goblin" else name for name in enabled)
         )
         await interaction.response.send_message(
             embed=card("☕ Bienvenue chez Moka", text), ephemeral=True

@@ -28,7 +28,8 @@ class RatesCog(commands.Cog):
             return None
 
     async def show(self, interaction, key, members):
-        guild, _, _ = context(interaction)
+        guild, user, _ = context(interaction)
+        self.service.require_play(guild, user)
         if not self.service.is_enabled(guild, "rates"):
             raise DomainError("Les taux du jour sont désactivés sur ce serveur.")
         if any(member.guild.id != guild for member in members):
@@ -68,10 +69,15 @@ class RatesCog(commands.Cog):
             )
             return
         filename = "moka-duo.png" if len(members) == 2 else "moka-taux.png"
-        embed.set_image(url="attachment://" + filename)
         await interaction.followup.send(
-            embed=embed,
-            file=discord.File(io.BytesIO(image), filename=filename),
+            file=discord.File(
+                io.BytesIO(image),
+                filename=filename,
+                description=(
+                    f"{result.rate.label} : {' et '.join(names)}, {result.percent} %. "
+                    f"{result.comment} {embed.footer.text}"
+                ),
+            ),
             allowed_mentions=discord.AllowedMentions.none(),
         )
 

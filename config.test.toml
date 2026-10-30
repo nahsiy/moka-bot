@@ -8,12 +8,21 @@ message_cooldown = 5
 words_cooldown = 1
 counting_reward_every = 3
 counting_failure_seconds = 3600
+# Modification du nombre après validation : pause de tous les jeux.
+counting_cheat_seconds = 3600
 counting_fine = 1000
+# Bonus surprise : 500 points de base = 5 % ; 0 désactive le tirage.
+counting_bonus_chance_bps = 500
+counting_bonus_min = 10
+counting_bonus_max = 50
 goblin_seconds = 30
 goblin_min_players = 1
 goblin_max_players = 20
 goblin_reward = 100
 goblin_interval_minutes = 0
+hug_seconds = 30
+hug_max_players = 20
+hug_reward = 200
 jackpot_seconds = 30
 
 [words]

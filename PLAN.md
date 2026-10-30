@@ -8,8 +8,9 @@ par le développement local.
 
 Remplacer les fonctions utiles de Sylhbot : progression écrit/vocal,
 classements et récompenses ; monnaie fictive, banque, intérêts, cadeaux ;
-paris, jackpot, vol, hack, gobelin ; counting et suite de mots ; animations ;
-rôles, tickets et automatismes communautaires. Pas de gemmes ni de fabrication
+paris, jackpot, vol, hack, tournée de Moka ; counting et association de mots ; animations ;
+rôles, tickets et automatismes communautaires ; accueil sur entretien,
+badges/titres, panneau privé de réglages et Juke-box partagé. Pas de gemmes ni de fabrication
 de gemmes. Boutique en cœurs. Modules indépendants pour cohabiter avec DraftBot.
 
 ## Périmètre et références

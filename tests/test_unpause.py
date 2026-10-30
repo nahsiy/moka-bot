@@ -170,6 +170,9 @@ async def test_unpause_command_checks_staff_permission_and_responds_privately(se
     await StaffCog.unpause.callback(cog, interaction, target)
     target.remove_roles.assert_awaited_once()
     assert interaction.followup.send.call_args.kwargs["ephemeral"] is True
-    assert "accès aux deux jeux rétabli" in interaction.followup.send.call_args.args[0]
+    assert (
+        "accès aux deux jeux rétabli"
+        in interaction.followup.send.call_args.kwargs["embed"].description
+    )
     bot.audit.assert_awaited_once()
     assert service.game_penalty(1, 10) is None

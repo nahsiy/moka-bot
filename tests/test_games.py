@@ -42,6 +42,8 @@ def test_counting_error_coin_fine_and_restart(service, fund, draw, score, next_n
     assert replayed == {**error, "replayed": True}
     assert restarted.profile(1, 10, viewer=10)["wallet"] == 2000
     # Après une erreur, l'auteur précédent peut reprendre même sur Pile.
+    # Ce nouveau nombre valide peut maintenant tirer le bonus surprise.
+    restarted.rng = service.rng
     result = restarted.counting(1, 5, 11, str(next_number), 104)
     assert result["valid"]
 

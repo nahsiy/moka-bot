@@ -17,7 +17,7 @@ ART = ASSETS / "rates"
 FONT = ASSETS / "fonts" / "Nunito.ttf"
 NAME_FONT = ASSETS / "fonts" / "NotoSans.ttf"
 EMOJI_FONT = ASSETS / "fonts" / "NotoColorEmoji.ttf"
-SIZE = (1360, 600)
+SIZE = (1200, 900)
 CREAM = (255, 244, 219)
 MUTED = (164, 185, 193)
 
@@ -194,51 +194,54 @@ def render_rate_card(
             (0, y, SIZE[0], y), fill=(int(17 + 7 * t), int(32 + 10 * t), int(43 + 9 * t), 255)
         )
     glow = Image.new("RGBA", SIZE)
-    ImageDraw.Draw(glow).ellipse((850, 60, 1330, 540), fill=accent + (40,))
+    ImageDraw.Draw(glow).ellipse((540, 230, 1150, 780), fill=accent + (40,))
     canvas = Image.alpha_composite(canvas, glow.filter(ImageFilter.GaussianBlur(65)))
     draw = ImageDraw.Draw(canvas)
-    draw.rounded_rectangle((1, 1, 1358, 598), radius=34, outline=(91, 119, 125), width=2)
-    draw.text((66, 40), "MOKA  /  LES TAUX DU JOUR", font=font(24, 800), fill=MUTED)
+    draw.rounded_rectangle((1, 1, 1198, 898), radius=34, outline=(91, 119, 125), width=2)
+    draw.text((60, 35), "MOKA  /  LES TAUX DU JOUR", font=font(24, 800), fill=MUTED)
     day = date.fromisoformat(result.day).strftime("%d.%m.%Y")
-    draw.text((1292, 40), day, font=font(24), fill=MUTED, anchor="ra")
+    draw.text((1140, 35), day, font=font(24), fill=MUTED, anchor="ra")
     duo = len(names) == 2
     if duo:
         joined = names[0] + "  &  " + names[1]
-        draw_name(canvas, (66, 88), joined, 37, 1220)
-        canvas.alpha_composite(avatar_image(avatars[0], names[0], 158, accent), (63, 181))
-        canvas.alpha_composite(avatar_image(avatars[1], names[1], 158, accent), (153, 310))
+        canvas.alpha_composite(avatar_image(avatars[0], names[0], 96, accent), (60, 100))
+        canvas.alpha_composite(avatar_image(avatars[1], names[1], 96, accent), (136, 100))
+        draw_name(canvas, (275, 117), joined, 39, 865)
     else:
-        canvas.alpha_composite(avatar_image(avatars[0], names[0], 202, accent), (67, 168))
-        draw_name(canvas, (66, 402), names[0], 31, 255)
+        canvas.alpha_composite(avatar_image(avatars[0], names[0], 96, accent), (60, 100))
+        draw_name(canvas, (195, 113), names[0], 43, 945)
     draw = ImageDraw.Draw(canvas)
-    left = 350
-    draw.text((left, 149), result.rate.label, font=font(43, 800), fill=accent)
-    draw.text((left - 5, 204), f"{result.percent} %", font=font(112, 900), fill=CREAM)
-    bar = (left, 352, left + 496, 374)
+    left = 60
+    labels = wrapped(result.rate.label, font(48, 800), 455)
+    for index, line in enumerate(labels):
+        draw.text((left, 265 + index * 55), line, font=font(48, 800), fill=accent)
+    percent_y = 340 if len(labels) == 1 else 385
+    draw.text((left - 5, percent_y), f"{result.percent} %", font=font(136, 900), fill=CREAM)
+    bar = (left, 558, left + 440, 582)
     draw.rounded_rectangle(bar, radius=11, fill=(55, 76, 86))
     if result.percent:
-        width = max(1, round(496 * result.percent / 100))
+        width = max(1, round(440 * result.percent / 100))
         draw.rounded_rectangle(
-            (left, 352, left + width, 374), radius=min(11, width // 2), fill=accent
+            (left, 558, left + width, 582), radius=min(11, width // 2), fill=accent
         )
-    for index, line in enumerate(wrapped(result.comment, font(30), 535)):
-        draw.text((left, 406 + index * 39), line, font=font(30), fill=CREAM)
+    for index, line in enumerate(wrapped(result.comment, font(35), 440, lines=3)):
+        draw.text((left, 625 + index * 45), line, font=font(35), fill=CREAM)
     with Image.open(art_dir / (result.rate.key + ".png")) as source:
         source = source.convert("RGBA")
         visible = source.getchannel("A").getbbox()
         if visible:
             source = source.crop(visible)
         illustration = colored_illustration(source, result.percent)
-    illustration = ImageOps.contain(illustration, (395, 415), method=Image.Resampling.LANCZOS)
+    illustration = ImageOps.contain(illustration, (630, 555), method=Image.Resampling.LANCZOS)
     canvas.alpha_composite(
         illustration,
-        (935 + (395 - illustration.width) // 2, 111 + (415 - illustration.height) // 2),
+        (525 + (630 - illustration.width) // 2, 220 + (555 - illustration.height) // 2),
     )
     draw = ImageDraw.Draw(canvas)
-    draw.line((66, 516, 1292, 516), fill=(66, 91, 101), width=1)
-    draw.text((66, 539), "Juste pour rire. Le taux change à minuit.", font=font(25), fill=MUTED)
+    draw.line((60, 815, 1140, 815), fill=(66, 91, 101), width=1)
+    draw.text((60, 840), "Juste pour rire. Le taux change à minuit.", font=font(24), fill=MUTED)
     if duo:
-        draw.text((1292, 539), "Même duo, même résultat.", font=font(25), fill=MUTED, anchor="ra")
+        draw.text((1140, 840), "Même duo, même résultat.", font=font(24), fill=MUTED, anchor="ra")
     out = io.BytesIO()
     canvas.convert("RGB").save(out, format="PNG", optimize=True)
     return out.getvalue()

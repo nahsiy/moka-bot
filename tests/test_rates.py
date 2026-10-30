@@ -138,6 +138,7 @@ def test_all_shipped_illustrations_are_square_transparent_and_render(rate):
     png = render_rate_card(result, tuple("Camille" for _ in users), tuple(None for _ in users))
     with Image.open(io.BytesIO(png)) as image:
         assert image.size == SIZE and image.format == "PNG"
+        assert 0.9 <= image.width / image.height <= 1.4
     assert len(png) < 2_000_000
 
 
@@ -185,12 +186,29 @@ async def test_rate_command_attaches_png_without_pings_or_economic_writes(servic
     interaction.response.defer.assert_awaited_once()
     options = interaction.followup.send.call_args.kwargs
     assert options["file"].filename == "moka-taux.png"
-    assert options["embed"].image.url == "attachment://moka-taux.png"
+    assert "embed" not in options
+    assert "content" not in options
+    assert "Camille" in options["file"].description
+    assert "Change à minuit (Paris)" in options["file"].description
     assert options["allowed_mentions"].users is False
     assert options["allowed_mentions"].roles is False
     with service.store.read() as con:
         assert con.execute("SELECT COUNT(*) FROM ledger").fetchone()[0] == 0
         assert con.execute("SELECT COUNT(*) FROM accounts").fetchone()[0] == 0
+
+
+async def test_rate_render_failure_keeps_accessible_text(service, monkeypatch):
+    interaction, bot, user = interaction_for(service)
+
+    def unavailable(*args):
+        raise OSError("Image indisponible")
+
+    monkeypatch.setattr("moka.cogs.rates.render_rate_card", unavailable)
+    await RatesCog(bot).show(interaction, "chance", (user,))
+    options = interaction.followup.send.call_args.kwargs
+    assert "file" not in options and "Chance du jour" in options["embed"].title
+    assert "<@10>" in options["embed"].description
+    assert options["allowed_mentions"].users is False
 
 
 async def test_rates_refuse_disabled_module_wrong_guild_and_self_duo(service):

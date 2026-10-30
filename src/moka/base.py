@@ -38,17 +38,21 @@ class BaseService:
         with self.store.read() as con:
             return self.setting(con, guild, key, default)
 
+    def _set_setting(self, con, guild, key, value):
+        con.execute(
+            "INSERT INTO settings VALUES(?,?,?) ON CONFLICT(guild,key) DO UPDATE SET value=excluded.value",
+            (guild, key, json.dumps(value)),
+        )
+
     def set_setting(self, guild, key, value):
         self.allowed(guild)
         with self.store.transaction() as con:
-            con.execute(
-                "INSERT INTO settings VALUES(?,?,?) ON CONFLICT(guild,key) DO UPDATE SET value=excluded.value",
-                (guild, key, json.dumps(value)),
-            )
+            self._set_setting(con, guild, key, value)
 
     def enabled(self, con, guild, feature):
         if not self.setting(con, guild, "feature:" + feature, self.config.features[feature]):
-            raise DomainError(f"Le module {feature} est désactivé sur ce serveur.")
+            label = {"goblin": "tournée de Moka", "hug": "câlin collectif"}.get(feature, feature)
+            raise DomainError(f"Le module {label} est désactivé sur ce serveur.")
 
     def is_enabled(self, guild, feature):
         self.allowed(guild)
@@ -65,8 +69,8 @@ class BaseService:
             con.execute("SELECT * FROM accounts WHERE guild=? AND user=?", (guild, user)).fetchone()
         )
 
-    def capacity(self, account):
-        return self.config.rules.bank_capacity * (account["bank_tier"] + 1)
+    def capacity(self, account, con=None):
+        return self.rules_for(account["guild"], con).bank_capacity * (account["bank_tier"] + 1)
 
     def profile(self, guild, user, *, viewer=None):
         self.allowed(guild)
@@ -77,8 +81,14 @@ class BaseService:
             account.update(
                 level=level(account["xp"]),
                 next_xp=100 * (level(account["xp"]) + 1) ** 2,
-                capacity=self.capacity(account),
+                capacity=self.capacity(account, con),
             )
+            title = con.execute(
+                "SELECT title FROM profile_titles WHERE guild=? AND user=?", (guild, user)
+            ).fetchone()
+            from moka.collection import TITLES
+
+            account["title"] = TITLES.get(title[0], {}).get("name") if title else None
             return account
 
     def leaderboard(self, guild, category="xp"):
@@ -96,11 +106,44 @@ class BaseService:
                 )
             ]
 
-    def perform(self, guild, user, action, key, features, fn):
+    def _all_games_penalty(self, con, guild, user):
+        row = con.execute(
+            "SELECT role,until FROM role_grants WHERE guild=? AND user=? AND reason='counting-edit' AND until>? ORDER BY until DESC LIMIT 1",
+            (guild, user, self.clock()),
+        ).fetchone()
+        return (
+            {"penalty_until": row["until"], "penalty_role": row["role"], "scope": "all"}
+            if row
+            else None
+        )
+
+    def all_games_penalty(self, guild, user):
+        self.allowed(guild)
+        with self.store.read() as con:
+            return self._all_games_penalty(con, guild, user)
+
+    def _require_play(self, con, guild, user):
+        if penalty := self._all_games_penalty(con, guild, user):
+            raise DomainError(
+                "🧽 Tu es de corvée de vaisselle : pause de tous les jeux jusqu’à "
+                f"<t:{int(penalty['penalty_until'])}:t> (<t:{int(penalty['penalty_until'])}:R>). "
+                "Le staff peut lever la sanction avec /debloquer."
+            )
+
+    def require_play(self, guild, user):
+        self.allowed(guild)
+        with self.store.read() as con:
+            self._require_play(con, guild, user)
+
+    def perform(self, guild, user, action, key, features, fn, *, game_exit=False):
         self.allowed(guild)
         if not key or len(str(key)) > 200:
             raise ValueError("Reçu invalide")
         with self.store.transaction() as con:
+            if not game_exit and (
+                action in {"bet", "robbery", "join", "hack-finish"} or action.startswith("start:")
+            ):
+                self._require_play(con, guild, user)
             previous = con.execute(
                 "SELECT * FROM receipts WHERE guild=? AND key=?", (guild, str(key))
             ).fetchone()
@@ -166,7 +209,7 @@ class BaseService:
         account = self.account(con, guild, user)
         before, after = level(account["xp"]), level(account["xp"] + xp)
         con.execute("UPDATE accounts SET xp=xp+? WHERE guild=? AND user=?", (xp, guild, user))
-        coins = (after - before) * self.config.rules.level_coins
+        coins = (after - before) * self.rules_for(guild, con).level_coins
         # Les niveaux continuent de fonctionner si l'économie est désactivée.
         if coins and self.setting(con, guild, "feature:economy", self.config.features["economy"]):
             coins = self.credit_prize(con, guild, user, coins, "level")
@@ -177,9 +220,9 @@ class BaseService:
     def activity(self, guild, user, key, kind="message"):
         if kind not in {"message", "voice"}:
             raise ValueError("Activité inconnue")
-        rules = self.config.rules
 
         def run(con):
+            rules = self.rules_for(guild, con)
             self.cooldown(
                 con, guild, user, kind, rules.message_cooldown if kind == "message" else 55
             )

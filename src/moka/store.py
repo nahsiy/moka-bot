@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS events (
 );
 CREATE INDEX IF NOT EXISTS events_active ON events(status,deadline);
 CREATE UNIQUE INDEX IF NOT EXISTS unique_active_goblin ON events(guild,kind) WHERE status='active' AND kind='goblin';
+CREATE UNIQUE INDEX IF NOT EXISTS unique_active_hug ON events(guild,kind) WHERE status='active' AND kind='hug';
 CREATE UNIQUE INDEX IF NOT EXISTS unique_active_jackpot ON events(guild,kind) WHERE status='active' AND kind='jackpot';
 CREATE UNIQUE INDEX IF NOT EXISTS unique_active_hack ON events(guild,owner,kind) WHERE status='active' AND kind='hack';
 CREATE TABLE IF NOT EXISTS participants (
@@ -85,6 +86,34 @@ CREATE TABLE IF NOT EXISTS voice_rooms (
 CREATE TABLE IF NOT EXISTS photos (
  guild INTEGER NOT NULL, user INTEGER NOT NULL, message INTEGER PRIMARY KEY,
  review_message INTEGER UNIQUE, status TEXT NOT NULL DEFAULT 'pending'
+);
+CREATE TABLE IF NOT EXISTS admissions (
+ guild INTEGER NOT NULL, user INTEGER NOT NULL,
+ status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','approved','refused')),
+ channel INTEGER UNIQUE, message INTEGER, voice INTEGER UNIQUE,
+ read_at REAL, attempt_at REAL, voice_requested INTEGER NOT NULL DEFAULT 0,
+ decided_by INTEGER, created REAL NOT NULL, updated REAL NOT NULL,
+ PRIMARY KEY(guild,user)
+);
+CREATE TABLE IF NOT EXISTS presence (
+ guild INTEGER NOT NULL, user INTEGER NOT NULL, started REAL NOT NULL,
+ last_at REAL, last_kind TEXT CHECK(last_kind IN ('message','voice')),
+ absent_until REAL, PRIMARY KEY(guild,user)
+);
+CREATE TABLE IF NOT EXISTS counting_validations (
+ guild INTEGER NOT NULL, channel INTEGER NOT NULL, message INTEGER NOT NULL,
+ user INTEGER NOT NULL, number INTEGER NOT NULL, created REAL NOT NULL,
+ sanction_until REAL, sanction_role INTEGER, notified INTEGER NOT NULL DEFAULT 0,
+ PRIMARY KEY(guild,message)
+);
+CREATE INDEX IF NOT EXISTS counting_validations_age ON counting_validations(guild,created);
+CREATE TABLE IF NOT EXISTS collections (
+ guild INTEGER NOT NULL, user INTEGER NOT NULL, kind TEXT NOT NULL,
+ item TEXT NOT NULL, earned REAL NOT NULL, PRIMARY KEY(guild,user,kind,item)
+);
+CREATE TABLE IF NOT EXISTS profile_titles (
+ guild INTEGER NOT NULL, user INTEGER NOT NULL, title TEXT,
+ PRIMARY KEY(guild,user)
 );
 PRAGMA user_version=1;
 """
