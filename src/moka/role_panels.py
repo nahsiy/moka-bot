@@ -17,6 +17,7 @@ CLEAR_ROLE_VALUE = "__clear__"
 
 def protected_roles(service, guild, *, include_presence=True, exclude_usage=None):
     reserved = set(service.get_setting(guild, "level_rewards", {}).values())
+    reserved.update(service.get_setting(guild, "moka:admin_roles", []))
     reserved.update(service.get_setting(guild, "ticket_staff_roles", []))
     reserved.update(service.get_setting(guild, "admission:staff_roles", []))
     reserved.update(
@@ -150,6 +151,7 @@ async def apply_public_choice(interaction, category, selected):
         if names
         else "Tes choix pour cette rubrique sont retirés."
     )
+    text += selected_channel_links(interaction.client.service, interaction.guild, selected)
     try:
         # Nouvelle référence : Discord abandonne ses cases cochées locales.
         # Le panneau reste commun, sans pré-cocher les rôles d'une personne.
@@ -160,6 +162,17 @@ async def apply_public_choice(interaction, category, selected):
         log.warning("Liste de préférences non rafraîchie après une attribution réussie")
         text += "\nTes rôles sont à jour, mais la liste n'a pas pu être rafraîchie. Rouvre le salon pour l'actualiser."
     await interaction.followup.send(embed=card("☕ Tes préférences", text), ephemeral=True)
+
+
+def selected_channel_links(service, guild, selected):
+    linked = service.get_setting(guild.id, "role_channels", {})
+    rooms = []
+    for role in sorted(selected):
+        if channel_id := linked.get(str(role)):
+            room = guild.get_channel(channel_id)
+            if isinstance(room, discord.TextChannel):
+                rooms.append(room.mention)
+    return "\n\n**Tes salons :** " + " · ".join(dict.fromkeys(rooms)) if rooms else ""
 
 
 class CategoryRoleSelect(
@@ -290,8 +303,18 @@ class RoleCategoryView(SafeView):
         super().__init__(timeout=None)
         menu = category_menu(service, guild.id, category)
         roles = [guild.get_role(int(rid)) for rid in menu]
+        linked = service.get_setting(guild.id, "role_channels", {})
         options = [
-            discord.SelectOption(label=role.name[:100], value=str(role.id))
+            discord.SelectOption(
+                label=role.name[:100],
+                value=str(role.id),
+                description=(
+                    f"Ouvre #{room.name}"[:100]
+                    if (channel_id := linked.get(str(role.id)))
+                    and (room := guild.get_channel(channel_id))
+                    else None
+                ),
+            )
             for role in roles
             if role
         ]

@@ -1,14 +1,42 @@
-# Validation de Moka 0.3.0 — état courant et historique
+# Validation de Moka 0.4.0 — état courant et historique
 
 ## État courant — 30 octobre 2026
 
-Après la revue de nettoyage : **430 tests passent sous Python 3.12 et sous Python
-3.13**, Ruff/formatage et diff conformes, configuration, démo, build et installation
-isolée du paquet vérifiés. Les ressources et liens locaux ont été contrôlés.
-Le build et l’exécution Docker Linux ARM64 sont également vérifiés : commandes,
-démo, trois cartes et décodage YouTube, en lecture seule et sans connexion Discord.
-Voir [la revue et ses limites](NETTOYAGE.md). Ces vérifications accompagnent la version 0.3.0. Les sections ci-dessous conservent
-les résultats datés de chaque étape ; leurs anciens nombres de tests sont historiques.
+**524 tests passent sous Python 3.12 et sous Python 3.13.** Ruff, formatage,
+38 commandes racines, démo hors ligne et intégrité SQLite sont vérifiés.
+La [revue 0.4.0](NETTOYAGE-0.4.0.md) décrit les corrections, compatibilités et
+contrôles de confidentialité ; les notes [0.4.0](RELEASE-0.4.0.md) expliquent la mise à jour.
+
+Recettes réelles distinctes des tests : administration privée, menus d'intérêts,
+notification de charte, clôture d'un entretien déjà validé et cycle de suppression
+sur un salon temporaire avec horloge séparée. Horoscope : douze éditions du jour
+relues à la source, sélection dans Discord, réponse privée et menu réinitialisé.
+Les captures, bases et identifiants de recette restent locaux et hors distribution.
+
+Les droits d'un nouvel arrivant sont vérifiés par profils synthétiques ; cela
+ne remplace pas une recette de bout en bout avec un nouveau compte humain.
+La garde sur vocal occupé et les échéances à sept jours sont testées hors ligne.
+Les votes musicaux avec plusieurs humains et la musique depuis le futur hôte
+restent à recetter. La validation Docker locale est consignée ci-dessous ; les
+résultats distants restent visibles dans [le workflow CI](https://github.com/nahsiy/moka-bot/actions/workflows/ci.yml).
+
+## Distribution et conteneur 0.4.0
+
+Wheel et archive source construits, dépendances verrouillées et paquet installé
+dans un environnement neuf. Depuis un répertoire extérieur au dépôt : version
+0.4.0, 38 commandes, démo et intégrité SQLite validées. Trois cartes sont rendues
+avec noms fictifs ; la nouvelle bannière et les polices sont présentes.
+
+Image Docker Linux ARM64 construite et exécutée : utilisateur 10001, racine en
+lecture seule, capacités retirées, privilèges supplémentaires interdits, temporaire
+de 64 Mio, deux CPU, 1 Gio et 256 processus. Même scénario de commandes, démo et
+rendu de trois cartes réussi ; bannière chargée, FFmpeg, Deno et yt-dlp disponibles.
+Ce test ne fournit ni token ni connexion Discord et ne relance pas YouTube.
+
+Le job CI construit et teste le conteneur sur son runner Linux, avec ces mêmes
+protections. La recette YouTube depuis le futur VPS reste distincte. Les paquets
+publics sont inspectés pour les fichiers privés, identifiants réels, chemins
+personnels, métadonnées d'image et liens locaux cassés.
 
 ## Historique de la recette
 
@@ -633,3 +661,23 @@ ne fait pas partie de cette preuve locale.
 
 La revue [NETTOYAGE.md](NETTOYAGE.md) précise les compatibilités conservées et le
 périmètre exact. Les résultats datés plus haut restent ceux des étapes précédentes.
+
+
+## Café des astres — intégré à 0.4.0
+
+516 tests hors ligne validés, dont 28 sur les horoscopes : dates Paris et passage
+de minuit, édition absente ou incomplète, réseau et redirections, cache et concurrence,
+permissions au clic, rôle facultatif et menus persistants. Ruff et contrôle de
+configuration passent ; le wheel contient le module et la nouvelle illustration.
+
+Lecture réseau réelle des douze signes vérifiée sur la même édition : aperçu RSS
+court, date et cinq notes cohérentes, liens vers les pages de l’éditeur. Salon
+créé dans La Pause Café, accès relus avec profils synthétiques en attente et
+accepté ; panneau illustré et douze options relus via l’API Discord. Ces profils
+ne remplacent pas une recette avec un nouveau compte humain.
+
+Recette via le client Discord : la liste des douze signes s’ouvre directement ;
+une sélection produit la lecture privée datée, les cinq notes et le lien complet.
+Le menu commun retrouve son état initial. Vérification depuis le compte responsable,
+sans attribuer ni retirer de rôle. Capture conservée uniquement dans les preuves
+locales ignorées par Git. Moka reconnecté après installation et synchronisation.

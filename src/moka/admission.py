@@ -13,6 +13,87 @@ def keyword_hash(value):
 
 
 class Admission(BaseService):
+    def approved_interviews(self, guild):
+        """Inclut les départs du serveur et les suppressions partiellement achevées."""
+        self.allowed(guild)
+        with self.store.read() as con:
+            return [
+                dict(row)
+                for row in con.execute(
+                    "SELECT * FROM admissions a WHERE guild=? AND status='approved' "
+                    "AND (channel IS NOT NULL OR voice IS NOT NULL OR EXISTS "
+                    "(SELECT 1 FROM admission_closures c WHERE c.guild=a.guild AND c.user=a.user))",
+                    (guild,),
+                )
+            ]
+
+    def admission_closure(self, guild, user):
+        self.allowed(guild)
+        with self.store.read() as con:
+            row = con.execute(
+                "SELECT * FROM admission_closures WHERE guild=? AND user=?", (guild, user)
+            ).fetchone()
+            return dict(row) if row else None
+
+    def plan_admission_closure(self, guild, user):
+        self.allowed(guild)
+        with self.store.transaction() as con:
+            con.execute(
+                "INSERT OR IGNORE INTO admission_closures(guild,user,channel,voice,created) "
+                "SELECT guild,user,channel,voice,? FROM admissions "
+                "WHERE guild=? AND user=? AND status='approved' AND channel IS NOT NULL",
+                (int(self.clock() * 1000) / 1000, guild, user),
+            )
+        return self.admission_closure(guild, user)
+
+    def arm_admission_closure(self, guild, user):
+        """Le délai part de l'annonce, pas d'une ancienne décision ou d'un échec réseau."""
+        self.allowed(guild)
+        with self.store.transaction() as con:
+            con.execute(
+                "UPDATE admission_closures SET delete_at=? "
+                "WHERE guild=? AND user=? AND notice IS NULL",
+                (int(self.clock()) + 7 * 86400, guild, user),
+            )
+        return self.admission_closure(guild, user)
+
+    def acknowledge_admission_closure(self, guild, user, message):
+        self.allowed(guild)
+        with self.store.transaction() as con:
+            con.execute(
+                "UPDATE admission_closures SET notice=? "
+                "WHERE guild=? AND user=? AND delete_at IS NOT NULL",
+                (message, guild, user),
+            )
+
+    def clear_closed_room(self, guild, user, field, channel):
+        self.allowed(guild)
+        if field not in {"channel", "voice"}:
+            raise ValueError("Salon d'accueil invalide")
+        with self.store.transaction() as con:
+            con.execute(
+                f"UPDATE admissions SET {field}=NULL"
+                + (",message=NULL" if field == "channel" else "")
+                + f" WHERE guild=? AND user=? AND status='approved' AND {field}=?",
+                (guild, user, channel),
+            )
+
+    def finish_admission_closure(self, guild, user):
+        self.allowed(guild)
+        with self.store.transaction() as con:
+            row = con.execute(
+                "SELECT 1 FROM admissions WHERE guild=? AND user=? AND status='approved' "
+                "AND channel IS NULL AND voice IS NULL",
+                (guild, user),
+            ).fetchone()
+            if not row:
+                raise DomainError("La clôture attend encore la suppression des salons privés.")
+            con.execute("DELETE FROM admission_closures WHERE guild=? AND user=?", (guild, user))
+            con.execute(
+                "DELETE FROM settings WHERE guild=? AND key=?",
+                (guild, f"admission:reading_notice:{user}"),
+            )
+
     def admission_enabled(self, guild):
         return bool(self.get_setting(guild, "admission:enabled", False))
 

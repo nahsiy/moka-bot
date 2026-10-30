@@ -12,6 +12,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
+from moka.admin_space import is_moka_admin
 from moka.admission_discord import require_access
 from moka.base import DomainError
 from moka.cogs.staff import staff
@@ -272,8 +273,8 @@ class MusicCog(commands.Cog):
             raise DomainError(f"Les commandes musicales se passent dans <#{text}>.")
         member = await interaction.guild.fetch_member(user)
         require_access(service, member, interaction.guild)
-        if staff_only and not member.guild_permissions.manage_guild:
-            raise DomainError("Seul le staff peut arrêter toute la file.")
+        if staff_only and not is_moka_admin(service, member, interaction.guild):
+            raise DomainError("Seul le staff de gestion de Moka peut arrêter toute la file.")
         voice = self.bot.channel_id(guild, "music_voice")
         if listening and (
             not member.voice or not member.voice.channel or member.voice.channel.id != voice
@@ -346,7 +347,9 @@ class MusicCog(commands.Cog):
                     player.queue.paused = False
                     text = "Lecture reprise."
                 elif player.queue.vote_skip(
-                    member.id, player.listeners(), member.guild_permissions.manage_guild
+                    member.id,
+                    player.listeners(),
+                    is_moka_admin(self.bot.service, member, interaction.guild),
                 ):
                     if not player.skipping:
                         voice.stop()
@@ -416,7 +419,9 @@ class MusicCog(commands.Cog):
     ):
         member, player = await self.authorize(interaction)
         async with player.lock:
-            track = player.queue.remove(numero, member.id, member.guild_permissions.manage_guild)
+            track = player.queue.remove(
+                numero, member.id, is_moka_admin(self.bot.service, member, interaction.guild)
+            )
         await interaction.response.send_message(
             embed=card("🎵 Morceau retiré", discord.utils.escape_markdown(track.title)),
             ephemeral=True,
@@ -426,8 +431,8 @@ class MusicCog(commands.Cog):
     async def install(self, interaction: discord.Interaction):
         staff(interaction)
         member = await interaction.guild.fetch_member(interaction.user.id)
-        if not member.guild_permissions.manage_guild:
-            raise DomainError("La permission Gérer le serveur est nécessaire.")
+        if not is_moka_admin(self.bot.service, member, interaction.guild):
+            raise DomainError("Un rôle de gestion de Moka ou Gérer le serveur est nécessaire.")
         await interaction.response.defer(ephemeral=True, thinking=True)
         spaces = await prepare_music(interaction.guild, self.bot.service)
         await self.player(interaction.guild).render()

@@ -8,6 +8,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from moka.admission_discord import require_access
 from moka.base import DomainError
 from moka.cogs.staff import staff
 from moka.discord_ui import SafeView, card, context
@@ -17,6 +18,7 @@ from moka.role_panels import (
     prepare_preferences,
     protected_roles,
     publish_categories,
+    selected_channel_links,
     validate_choices,
 )
 
@@ -78,8 +80,11 @@ class RoleSelect(discord.ui.Select):
         validate_choices(cog.service, guild, self.category, selected)
         await interaction.response.defer(ephemeral=True)
         await cog.apply_role_preferences(interaction, self.category, selected)
+        text = "Tes rôles sont mis à jour." + selected_channel_links(
+            cog.service, interaction.guild, selected
+        )
         await interaction.edit_original_response(
-            content=None, embed=card("☕ Tes préférences", "Tes rôles sont mis à jour."), view=None
+            content=None, embed=card("☕ Tes préférences", text), view=None
         )
 
 
@@ -201,9 +206,15 @@ class CommunityCog(commands.Cog):
     async def apply_role_preferences(self, interaction, category, selected):
         guild, user, _ = context(interaction)
         validate_choices(self.service, guild, category, selected)
-        lock = self.role_locks.setdefault((guild, user), asyncio.Lock())
+        admission = getattr(self.bot, "get_cog", lambda _: None)("AdmissionCog")
+        lock = (
+            admission.lock(guild, user)
+            if admission
+            else self.role_locks.setdefault((guild, user), asyncio.Lock())
+        )
         async with lock:
             member = await interaction.guild.fetch_member(user)
+            require_access(self.service, member, interaction.guild)
             # Même contrôle après l'attente : une fenêtre ancienne ne rétablit aucun choix retiré.
             menu = validate_choices(self.service, guild, category, selected)
             roles = [interaction.guild.get_role(int(key)) for key in menu]

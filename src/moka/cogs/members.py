@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import hashlib
 import io
 import json
-from datetime import UTC, datetime
 from typing import Literal
 
 import discord
@@ -320,45 +318,6 @@ class MembersCog(commands.Cog):
     )
     async def insult(self, interaction: discord.Interaction, membre: discord.Member | None = None):
         await self.fun(interaction, membre, True)
-
-    @app_commands.command(
-        name="horoscope", description="Une petite lecture du jour, pour le divertissement"
-    )
-    async def horoscope(
-        self,
-        interaction: discord.Interaction,
-        signe: Literal[
-            "Bélier",
-            "Taureau",
-            "Gémeaux",
-            "Cancer",
-            "Lion",
-            "Vierge",
-            "Balance",
-            "Scorpion",
-            "Sagittaire",
-            "Capricorne",
-            "Verseau",
-            "Poissons",
-        ],
-    ):
-        guild, _, _ = context(interaction)
-        if not self.service.is_enabled(guild, "horoscope"):
-            raise DomainError("L'horoscope est désactivé.")
-        today = datetime.now(UTC).date().isoformat()
-        seed = hashlib.sha256(f"{today}:{signe}".encode()).digest()
-        texts = [
-            "Un échange inattendu pourrait égayer ta journée.",
-            "Un projet laissé de côté mérite peut-être un nouveau regard.",
-            "Une pause et un café peuvent laisser place à une bonne idée.",
-            "Un petit geste amical peut faire beaucoup de bien.",
-        ]
-        embed = card(f"✨ {signe} · {today}", texts[seed[0] % len(texts)])
-        for index, name in enumerate(("Ambiance", "Rencontres", "Créativité", "Chance"), 1):
-            stars = seed[index] % 5 + 1
-            embed.add_field(name=name, value="★" * stars + "☆" * (5 - stars))
-        embed.set_footer(text="Texte fictif de divertissement · aucune prédiction scientifique")
-        await interaction.response.send_message(embed=embed)
 
     @app_commands.command(
         name="confidentialite", description="Masquer ou rendre public ton profil et tes classements"

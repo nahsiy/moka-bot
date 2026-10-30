@@ -4,10 +4,12 @@ Un compagnon Discord francophone : discussions, progression et petites
 animations pour faire vivre une communauté. Python 3.12+, SQLite, modules
 activables séparément. Aucun service payant ni modèle IA requis.
 
-**Moka 0.3.0 — Le Comptoir prend vie.** Accueil sur entretien, rôles au choix,
-profil et banque, badges et titres, panneau du Barista, cartes originales et
-Juke-box partagé. Les [notes de version](docs/RELEASE-0.3.0.md) présentent les
-nouveautés et la mise à jour depuis 0.2.0.
+**Moka 0.4.0 — Le Comptoir s'organise.** Gestion du bot par rôles dédiés,
+annuaire de l'équipe, salons selon les intérêts, suivi et clôture des accueils,
+nettoyage confirmé des messages et horoscope éditorial sourcé.
+Les [notes de version](docs/RELEASE-0.4.0.md) présentent les nouveautés et la mise
+à jour depuis 0.3.0. Le [guide VPS](docs/DEPLOIEMENT-VPS.md) prépare la bascule
+vers un hébergement permanent, sans lancer une seconde instance.
 Les tests locaux et les parcours réellement essayés dans Discord sont détaillés
 séparément dans [VALIDATION.md](docs/VALIDATION.md).
 
@@ -50,7 +52,7 @@ ci-dessous.
 | Distractions | Paris, jackpot collectif, vol de portefeuille, mini-jeu de hack |
 | [Tournée de Moka](docs/TOURNEE.md) | Pause café illustrée, inscriptions, compte à rebours et récompense collective |
 | Jeux de salon | Counting avec calculs, amende et pile ou face, record, rôle d'erreur temporaire ; suite de mots avec deux modes |
-| Ambiance | 50 compliments et 50 taquineries illustrés, trois éditions, cinq dernières phrases évitées, horoscope fictif |
+| Ambiance | 50 compliments et 50 taquineries illustrés, trois éditions, cinq dernières phrases évitées ; [horoscope publié](docs/HOROSCOPE.md) dans son salon, aperçu daté et notes de l'éditeur, lien vers le texte complet |
 | Taux du jour | 8 taux individuels et 6 duos, cartes illustrées avec avatars, résultats fixes jusqu'à minuit |
 | Boutique et souvenirs | Objets à offrir, 8 badges et 4 titres décoratifs ; achats privés, aucune gemme |
 | [Le Juke-box](docs/JUKEBOX.md) | File partagée, lecteur illustré, commandes dans un salon dédié et écoute vocale sans micros |
@@ -59,7 +61,8 @@ ci-dessous.
 | Administration | Panneau privé du Barista, règles par serveur, diagnostic, correction journalisée des cœurs, timeout manuel |
 | Données | Profil privé, export personnel, effacement confirmé, sauvegarde cohérente |
 
-Le catalogue et les textes sont originaux. Les montants, probabilités et règles
+Le catalogue et les textes de Moka sont originaux ; les aperçus d'horoscope
+citent leur éditeur et renvoient vers son texte complet. Les montants, probabilités et règles
 par défaut sont des propositions, **pas une copie vérifiée de l'équilibrage de
 Sylhbot**. Le vol bancaire, les immunités par rôle et les fonctionnalités de
 modération non inventoriées ne sont pas implémentés à ce stade. La matrice

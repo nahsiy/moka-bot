@@ -6,6 +6,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from moka.admin_space import is_moka_admin, show_team
 from moka.base import DomainError
 from moka.config import CHANNELS, FEATURES, ROLES
 from moka.discord_ui import card, context, event_message
@@ -14,7 +15,14 @@ from moka.role_panels import category_key
 
 def staff(interaction, permission="manage_guild"):
     values = context(interaction)
-    if not getattr(interaction.user.guild_permissions, permission, False):
+    if not getattr(interaction.user.guild_permissions, permission, False) and not (
+        permission == "manage_guild"
+        and is_moka_admin(interaction.client.service, interaction.user, interaction.guild)
+    ):
+        if permission == "manage_guild":
+            raise DomainError(
+                "Il faut un rôle de gestion de Moka ou la permission Discord Gérer le serveur."
+            )
         raise DomainError(f"La permission {permission} est nécessaire.")
     return values
 
@@ -23,31 +31,132 @@ class StaffCog(commands.Cog):
     config = app_commands.Group(
         name="config",
         description="Configuration de Moka",
-        default_permissions=discord.Permissions(manage_guild=True),
     )
     animation = app_commands.Group(
         name="animation",
         description="Lancer les animations collectives",
-        default_permissions=discord.Permissions(manage_guild=True),
     )
     moderation = app_commands.Group(
         name="moderation",
         description="Modération manuelle et journalisée",
         default_permissions=discord.Permissions(moderate_members=True),
     )
+    messages = app_commands.Group(
+        name="messages",
+        description="Préparer et confirmer un nettoyage des messages",
+        default_permissions=discord.Permissions(manage_messages=True),
+    )
 
     def __init__(self, bot):
         self.bot, self.service = bot, bot.service
 
-    @app_commands.command(name="barista", description="Ouvrir le panneau privé de réglages de Moka")
-    @app_commands.default_permissions(manage_guild=True)
-    async def panel(self, interaction: discord.Interaction):
-        from moka.staff_panel import authorize, render_panel
+    @messages.command(name="vider", description="Préparer le nettoyage d'un salon, puis confirmer")
+    async def clear_messages(
+        self,
+        interaction: discord.Interaction,
+        salon: discord.TextChannel | None = None,
+        garder_epingles: bool = True,
+    ):
+        from moka.message_cleanup import preview
 
-        guild, owner, _ = context(interaction)
-        await authorize(interaction, guild, owner)
-        await interaction.response.defer(ephemeral=True, thinking=True)
-        await render_panel(interaction)
+        await preview(interaction, salon, keep_pinned=garder_epingles)
+
+    @messages.command(
+        name="avant", description="Supprimer les messages antérieurs à une date, après aperçu"
+    )
+    @app_commands.describe(date="AAAA-MM-JJ : avant minuit, heure de Paris")
+    async def messages_before(
+        self,
+        interaction: discord.Interaction,
+        date: str,
+        salon: discord.TextChannel | None = None,
+        garder_epingles: bool = True,
+    ):
+        from moka.message_cleanup import date_boundary, preview
+
+        cutoff = date_boundary(date)
+        await preview(
+            interaction,
+            salon,
+            keep_pinned=garder_epingles,
+            before=cutoff,
+            label=f"Avant le {cutoff:%d/%m/%Y} à 00:00 (Paris)",
+        )
+
+    @messages.command(
+        name="anciens", description="Préparer le retrait des messages de plus de X jours"
+    )
+    async def old_messages(
+        self,
+        interaction: discord.Interaction,
+        jours: app_commands.Range[int, 1, 3650],
+        salon: discord.TextChannel | None = None,
+        garder_epingles: bool = True,
+    ):
+        from datetime import timedelta
+
+        from moka.message_cleanup import preview
+
+        cutoff = discord.utils.snowflake_time(interaction.id) - timedelta(days=jours)
+        await preview(
+            interaction,
+            salon,
+            keep_pinned=garder_epingles,
+            before=cutoff,
+            label=f"Messages de plus de {jours} jour(s)",
+        )
+
+    @messages.command(
+        name="depuis", description="Préparer le retrait d'un message et de ceux qui le suivent"
+    )
+    async def messages_since(
+        self,
+        interaction: discord.Interaction,
+        identifiant: str,
+        salon: discord.TextChannel | None = None,
+        garder_epingles: bool = True,
+    ):
+        from moka.message_cleanup import message_id, preview
+
+        ident = message_id(identifiant)
+        await preview(
+            interaction,
+            salon,
+            keep_pinned=garder_epingles,
+            since=ident,
+            label=f"Depuis le message {ident}, inclus",
+        )
+
+    @messages.command(
+        name="supprimer", description="Préparer la suppression d'un seul message, puis confirmer"
+    )
+    async def remove_message(
+        self,
+        interaction: discord.Interaction,
+        identifiant: str,
+        salon: discord.TextChannel | None = None,
+        garder_epingles: bool = True,
+    ):
+        from moka.message_cleanup import message_id, preview
+
+        ident = message_id(identifiant)
+        await preview(
+            interaction,
+            salon,
+            keep_pinned=garder_epingles,
+            single=ident,
+            label=f"Message {ident} uniquement",
+        )
+
+    @app_commands.command(name="barista", description="Ouvrir le panneau privé de réglages de Moka")
+    async def panel(self, interaction: discord.Interaction):
+        from moka.staff_panel import open_panel
+
+        await open_panel(interaction)
+
+    @app_commands.command(name="equipe", description="Voir qui gère Moka, l'accueil et les tickets")
+    async def team(self, interaction: discord.Interaction):
+        await show_team(interaction)
 
     @config.command(
         name="jukebox", description="Installer ou vérifier les espaces et le lecteur du Juke-box"
@@ -73,7 +182,7 @@ class StaffCog(commands.Cog):
             ephemeral=True,
         )
         await self.bot.audit(
-            interaction.guild, f"Configuration : {nom}={actif} par {interaction.user.id}."
+            interaction.guild, f"Configuration : {nom}={actif} par <@{interaction.user.id}>."
         )
 
     @module.autocomplete("nom")
@@ -337,7 +446,6 @@ class StaffCog(commands.Cog):
         name="debloquer",
         description="Lever une pause des jeux, Café renversé ou corvée de vaisselle",
     )
-    @app_commands.default_permissions(manage_guild=True)
     async def unpause(self, interaction: discord.Interaction, membre: discord.Member):
         guild, actor, key = staff(interaction)
         if membre.bot or membre.guild.id != guild:
@@ -357,7 +465,7 @@ class StaffCog(commands.Cog):
         await interaction.followup.send(embed=card("☕ Retour au comptoir", text), ephemeral=True)
         if not result["replayed"]:
             await self.bot.audit(
-                interaction.guild, f"Pause des jeux levée pour {membre.id} par {actor}."
+                interaction.guild, f"Pause des jeux levée pour <@{membre.id}> par <@{actor}>."
             )
 
     @config.command(
@@ -376,7 +484,7 @@ class StaffCog(commands.Cog):
         self.service.adjust(guild, membre.id, montant, key)
         await self.bot.audit(
             interaction.guild,
-            f"Ajustement {montant:+} ❤️ pour {membre.id} par {interaction.user.id}. Motif : {motif}",
+            f"Ajustement {montant:+} ❤️ pour <@{membre.id}> par <@{interaction.user.id}>. Motif : {motif}",
         )
         await interaction.response.send_message(
             embed=card(
@@ -416,7 +524,6 @@ class StaffCog(commands.Cog):
     @app_commands.command(
         name="diagnostic", description="Vérifier la configuration et les permissions de Moka"
     )
-    @app_commands.default_permissions(manage_guild=True)
     async def diagnostic(self, interaction: discord.Interaction):
         guild, _, _ = staff(interaction)
         await interaction.response.defer(ephemeral=True)
@@ -484,7 +591,7 @@ class StaffCog(commands.Cog):
         await membre.timeout(timedelta(minutes=minutes), reason=f"{interaction.user.id} : {motif}")
         await self.bot.audit(
             interaction.guild,
-            f"Timeout {minutes} min pour {membre.id} par {interaction.user.id}. Motif : {motif}",
+            f"Timeout {minutes} min pour <@{membre.id}> par <@{interaction.user.id}>. Motif : {motif}",
         )
         await interaction.followup.send(
             embed=card("🛡️ Modération", "Pause appliquée."), ephemeral=True
@@ -496,6 +603,6 @@ class StaffCog(commands.Cog):
         await interaction.response.defer(ephemeral=True)
         await membre.timeout(None, reason=f"Moka : {interaction.user.id}")
         await self.bot.audit(
-            interaction.guild, f"Timeout retiré pour {membre.id} par {interaction.user.id}."
+            interaction.guild, f"Timeout retiré pour <@{membre.id}> par <@{interaction.user.id}>."
         )
         await interaction.followup.send(embed=card("🛡️ Modération", "Pause levée."), ephemeral=True)

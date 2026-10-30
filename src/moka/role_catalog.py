@@ -15,7 +15,7 @@ PREFERENCES = {
     ),
     "signe": (
         "✨ Une touche d'astrologie",
-        "Ton signe, pour le folklore du comptoir et les horoscopes pour rire.",
+        "Ton signe, pour retrouver ta lecture au café des astres. Choix facultatif.",
         True,
         [
             "♈ Bélier",

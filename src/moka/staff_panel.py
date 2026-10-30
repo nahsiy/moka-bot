@@ -6,6 +6,7 @@ from decimal import Decimal, InvalidOperation
 
 import discord
 
+from moka.admin_space import is_moka_admin
 from moka.base import DomainError
 from moka.config import FEATURES
 from moka.discord_ui import SafeView, card, context, handle_error
@@ -173,9 +174,18 @@ async def authorize(interaction, guild_id, owner):
     if guild != guild_id or user != owner:
         raise DomainError("Ce panneau appartient à une autre personne. Ouvre /barista.")
     member = await interaction.guild.fetch_member(user)
-    if not member.guild_permissions.manage_guild:
-        raise DomainError("La permission Gérer le serveur est nécessaire pour ce panneau.")
+    if not is_moka_admin(interaction.client.service, member, interaction.guild):
+        raise DomainError(
+            "Ce panneau exige un rôle de gestion de Moka ou la permission Gérer le serveur."
+        )
     return guild, user
+
+
+async def open_panel(interaction):
+    guild, owner, _ = context(interaction)
+    await authorize(interaction, guild, owner)
+    await interaction.response.defer(ephemeral=True, thinking=True)
+    await render_panel(interaction)
 
 
 def panel_embed(service, guild, section, status=None):
@@ -318,7 +328,7 @@ class RulesModal(discord.ui.Modal):
             interaction.guild,
             "Réglages du panneau Barista modifiés : "
             + ", ".join(changes)
-            + f" par {interaction.user.id}.",
+            + f" par <@{interaction.user.id}>.",
         )
         await render_panel(
             interaction, self.panel.section, status="✅ Réglages enregistrés.", previous=self.panel
@@ -421,7 +431,8 @@ class StaffPanel(SafeView):
             guild, self.pending_modules, expected=self.expected_modules
         )
         await interaction.client.audit(
-            interaction.guild, f"Modules du panneau Barista enregistrés par {interaction.user.id}."
+            interaction.guild,
+            f"Modules du panneau Barista enregistrés par <@{interaction.user.id}>.",
         )
         await render_panel(
             interaction, "modules", status="✅ Fonctions enregistrées.", previous=self

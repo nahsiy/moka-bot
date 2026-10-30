@@ -37,3 +37,24 @@ Sorties avec fond transparent ; typographie et cadres ajoutés localement.
 Palette : crème #FFF4DB, menthe #72D2BE, café #BC8053, détails bleu nuit #12232E.
 Aucun avatar humain transmis au générateur. Les prompts sont originaux ; aucun
 asset du bot de référence n’est réutilisé.
+
+## Le café des astres
+
+Créée le 30 octobre 2026 avec l'outil intégré imagegen. Fichier :
+`src/moka/assets/horoscope/moka-cafe-astres.png`, PNG opaque, format panoramique.
+Référence de personnage : `assets/branding/moka-bot-avatar.png` uniquement.
+
+Prompt : illustration 3D chaleureuse d'un comptoir la nuit, Moka robot-tasse
+céramique crème rempli d'espresso, yeux souriants, petits bras mécaniques et
+lumières turquoise, observant les étoiles au télescope en laiton. Atlas céleste
+ouvert et globe discret, lune en croissant et quelques constellations dehors.
+Composition panoramique 3:1, espace dégagé bleu nuit à gauche, mascotte à droite,
+matériaux café/crème/laiton, lumières douces, silhouette lisible sur mobile.
+Palette #12232E, #FFF4DB, #BC8053, #72D2BE, #E7C37E.
+Aucun texte, filigrane, logo tiers, visage humain, costume de voyance ou boule de cristal.
+
+Prompt final transmis à l'outil intégré :
+
+```text
+Use case: illustration-story. Asset type: wide horizontal banner for a Discord horoscope channel for the French community Le Comptoir de Moka. Create a polished cinematic 3D illustration using the reference image ONLY as character identity reference: Moka is a cute cream ceramic espresso cup robot filled with coffee, dark brown smiling eyes, little mechanical arms and turquoise lights. Preserve that identity and exact cozy quality, no owl and no human face. Scene: a warm café counter beside a window at night, a subtle brass celestial globe and an open star atlas, a crescent moon and a few elegant constellations outside. The mascot is on the right side calmly observing stars with a small brass telescope. Keep a broad uncluttered deep midnight blue area on the left, because real interface text will sit outside the artwork. Colors deep midnight #12232E, cream #FFF4DB, coffee #BC8053, subtle mint #72D2BE, muted gold #E7C37E. Friendly sophisticated cozy bar atmosphere, beautiful readable silhouettes at mobile size, soft warm light, rich ceramic and brass materials, generous breathing room. Wide landscape 3:1 banner composition. No text, no letters, no watermark, no company logos, no fake labels, no exact zodiac glyph wheel, no crystal ball, no fortune teller costume. Original project illustration, not a screenshot or UI mockup.
+```

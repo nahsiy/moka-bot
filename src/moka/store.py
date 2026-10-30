@@ -95,6 +95,11 @@ CREATE TABLE IF NOT EXISTS admissions (
  decided_by INTEGER, created REAL NOT NULL, updated REAL NOT NULL,
  PRIMARY KEY(guild,user)
 );
+CREATE TABLE IF NOT EXISTS admission_closures (
+ guild INTEGER NOT NULL, user INTEGER NOT NULL, channel INTEGER NOT NULL,
+ voice INTEGER, created REAL NOT NULL, delete_at REAL, notice INTEGER,
+ PRIMARY KEY(guild,user)
+);
 CREATE TABLE IF NOT EXISTS presence (
  guild INTEGER NOT NULL, user INTEGER NOT NULL, started REAL NOT NULL,
  last_at REAL, last_kind TEXT CHECK(last_kind IN ('message','voice')),

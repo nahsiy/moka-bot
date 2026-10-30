@@ -1,8 +1,36 @@
 # Le tableau du Barista
 
-`/barista` ouvre un panneau privé de cinq minutes, réservé à la permission
-**Gérer le serveur**. L’identité, le serveur, l’accueil et la permission actuelle
+`/barista` ouvre un panneau privé de cinq minutes, réservé au propriétaire,
+aux rôles de gestion de Moka configurés et à la permission Discord
+**Gérer le serveur**. L’identité, le serveur, l’accueil et l'autorisation actuelle
 sont vérifiés à chaque action, y compris après ouverture d’un formulaire.
+
+## L'arrière-comptoir
+
+L'installation communautaire dispose d'une catégorie privée **🔐 L’ARRIÈRE-COMPTOIR** :
+
+- **🧭・tableau-de-bord** : encart permanent et boutons Réglages, Équipe, Diagnostic et Guide.
+- **💬・coulisses** : coordination de l'équipe.
+- **📋・journal-moka** : journal conservé, en lecture pour le staff.
+
+Le rôle **☕ Baristas** donne la gestion de Moka via le réglage local
+`moka:admin_roles`. Ses permissions Discord globales restent à zéro. Le rôle
+**🫖 Équipe du Comptoir** est configuré pour l'accueil et les tickets.
+Ces rôles sont exclus des rôles que les membres peuvent choisir eux-mêmes.
+
+`/equipe` et le bouton **Qui gère Moka ?** affichent en privé les responsables,
+l'équipe d'accueil, les personnes autorisées aux tickets et les permissions de
+modération Discord. Les rôles et les membres sont relus depuis Discord à chaque
+consultation ; les mentions n'envoient aucune notification. Le propriétaire et
+les personnes ayant Gérer le serveur gardent leur accès, même sans rôle Moka.
+
+Les commandes de gestion restent visibles sans exiger une permission Discord
+globale ; la vérification de l'autorisation se fait à chaque exécution. Retirer le
+rôle ou sa configuration retire cet accès. Le rôle ne donne pas les permissions
+Discord Gérer les messages ou Exclure temporairement des membres : ces droits
+restent indispensables aux nettoyages et aux timeouts correspondants.
+
+## Les réglages privés
 
 Le menu propose une vue d’ensemble, les fonctions actives et des rubriques par
 usage. Un formulaire prérempli modifie les règles d’une rubrique ensemble :

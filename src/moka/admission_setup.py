@@ -5,7 +5,25 @@ import discord
 from moka.admission import keyword_hash
 from moka.admission_discord import entry_overwrites
 from moka.base import DomainError
+from moka.cogs.presence import private_staff_channel
 from moka.discord_ui import card
+
+
+def validate_arrival_announcements(guild, service):
+    """Les annonces Discord doivent être coupées ou réservées au staff."""
+    if not guild.system_channel_flags.join_notifications:
+        return
+    channel = guild.system_channel
+    if channel is None and getattr(guild, "_system_channel_id", None):
+        raise DomainError(
+            "Recharge les salons du serveur avant de vérifier le salon système des arrivées."
+        )
+    if channel is not None and not private_staff_channel(service, channel):
+        raise DomainError(
+            "Les annonces d'arrivée Discord sont visibles par les membres. "
+            "Dans les paramètres du serveur, choisis un salon système réservé au staff "
+            "ou désactive les annonces d'arrivée avant d'activer les entretiens."
+        )
 
 
 def charter(keyword):
@@ -66,6 +84,7 @@ async def prepare_admission(guild, service, *, keyword):
         raise DomainError(
             "L'accueil est déjà activé : ne pas recalculer les anciens accès publics."
         )
+    validate_arrival_announcements(guild, service)
     if not keyword.strip() or len(keyword) > 40:
         raise DomainError("Choisis un mot de lecture court.")
     if (

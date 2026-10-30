@@ -2,6 +2,10 @@ services:
   moka:
     build: .
     restart: unless-stopped
+    init: true
+    cpus: 2.0
+    mem_limit: 1g
+    pids_limit: 256
     env_file: .env
     environment:
       MOKA_DATA_DIR: /data

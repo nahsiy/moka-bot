@@ -131,6 +131,7 @@ class MokaBot(commands.Bot):
     async def load_cogs(self):
         from moka.cogs.admission import AdmissionCog
         from moka.cogs.community import CommunityCog
+        from moka.cogs.horoscope import HoroscopeCog
         from moka.cogs.members import MembersCog
         from moka.cogs.music import MusicCog
         from moka.cogs.presence import PresenceCog
@@ -138,6 +139,7 @@ class MokaBot(commands.Bot):
         from moka.cogs.staff import StaffCog
 
         await self.add_cog(MembersCog(self))
+        await self.add_cog(HoroscopeCog(self))
         await self.add_cog(MusicCog(self))
         await self.add_cog(RatesCog(self))
         await self.add_cog(StaffCog(self))
@@ -146,12 +148,17 @@ class MokaBot(commands.Bot):
         await self.add_cog(PresenceCog(self))
 
     async def setup_hook(self):
+        from moka.admin_space import AdminHub
         from moka.admission_discord import AdmissionView
+        from moka.cogs.horoscope import HoroscopeSelect, HoroscopeView
         from moka.cogs.music import MusicView
 
         self.store.initialize()
         await self.load_cogs()
+        self.add_view(AdminHub())
         self.add_view(MusicView())
+        self.add_view(HoroscopeView())
+        self.add_dynamic_items(HoroscopeSelect)
         self.add_view(AdmissionView())
         self.add_view(JoinView())
         self.add_dynamic_items(
@@ -501,14 +508,18 @@ class MokaBot(commands.Bot):
         for guild in self.guilds:
             if guild.id not in self.config.guild_ids:
                 continue
-            try:
-                await self.get_cog("AdmissionCog").reconcile(guild)
-                await community.reconcile(guild)
-                await self.reconcile_level_roles(guild)
-                await self.auto_goblin(guild)
-                await self.get_cog("PresenceCog").reconcile(guild)
-            except Exception:
-                log.exception("Maintenance serveur %s impossible", guild.id)
+            for label, action in (
+                ("accueil", self.get_cog("AdmissionCog").reconcile),
+                ("communauté", community.reconcile),
+                ("rôles XP", self.reconcile_level_roles),
+                ("tournée", self.auto_goblin),
+                ("présence", self.get_cog("PresenceCog").reconcile),
+                ("horoscope", self.get_cog("HoroscopeCog").refresh_home),
+            ):
+                try:
+                    await action(guild)
+                except Exception:
+                    log.exception("Maintenance %s impossible pour le serveur %s", label, guild.id)
 
     @maintenance.before_loop
     async def before_maintenance(self):

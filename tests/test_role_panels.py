@@ -18,7 +18,52 @@ from moka.role_panels import (
     category_menu,
     prepare_preferences,
     publish_categories,
+    selected_channel_links,
 )
+
+
+async def test_interest_menu_hints_and_private_links(preferences, service):
+    p = preferences
+    await setup_preferences(p, service)
+    room = Mock(spec=discord.TextChannel)
+    room.id, room.name, room.mention = 700, "coin-lecture", "<#700>"
+    p.guild.get_channel = lambda cid: room if cid == 700 else None
+    service.set_setting(1, "role_channels", {"104": 700})
+    view = RoleCategoryView("interets", p.guild, service)
+    option = next(o for o in view.children[0].item.options if o.value == "104")
+    assert option.description == "Ouvre #coin-lecture"
+    assert "<#700>" in selected_channel_links(service, p.guild, {"104"})
+    assert selected_channel_links(service, p.guild, set()) == ""
+    assert selected_channel_links(service, p.guild, {"101"}) == ""
+    assert selected_channel_links(service, SimpleNamespace(id=2), {"104"}) == ""
+
+
+async def test_role_choice_cannot_reopen_rooms_during_admission_change(preferences, service):
+    import asyncio
+
+    p = preferences
+    await setup_preferences(p, service)
+    p.guild.owner_id = 9998
+    p.member.roles = [p.guild.get_role(203)]
+    service.set_setting(1, "admission:enabled", True)
+    service.set_setting(1, "admission:member_role", 203)
+    service.begin_admission(1, p.member.id, established=True)
+    shared = asyncio.Lock()
+    p.cog.bot.get_cog = lambda _: SimpleNamespace(lock=lambda *args: shared)
+    async with shared:
+        choosing = asyncio.create_task(
+            p.cog.apply_role_preferences(p.interaction, "interets", {"104"})
+        )
+        await asyncio.sleep(0)
+        assert not choosing.done()
+        # Simuler la décision de l'accueil pendant que le choix attend son tour.
+        with service.store.transaction() as con:
+            con.execute(
+                "UPDATE admissions SET status='pending' WHERE guild=1 AND user=?", (p.member.id,)
+            )
+    with pytest.raises(DomainError, match="premier café"):
+        await choosing
+    p.member.add_roles.assert_not_awaited()
 
 
 @pytest.fixture

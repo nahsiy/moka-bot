@@ -105,6 +105,8 @@ class ReadingModal(discord.ui.Modal, title="Un petit mot pour la charte"):
                 interaction.guild_id, interaction.user.id, str(self.keyword)
             )
             await cog.refresh(interaction.guild, interaction.user.id)
+            if valid:
+                await cog.notify_reading(interaction.guild, interaction.user.id)
         await interaction.followup.send(
             embed=card(
                 "📜 Ta lecture",

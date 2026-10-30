@@ -18,7 +18,7 @@ disponible pour revoir ses préférences dans un menu privé pré-coché.
 | --- | --- | --- |
 | Comment te présenter ? | 4 pronoms ou absence de précision | Un seul, facultatif |
 | Rythme de présence | Matin, soir, horaires variables | Un seul, facultatif |
-| Signe | 12 signes pour les horoscopes fictifs | Un seul, facultatif |
+| Signe | 12 signes pour retrouver sa lecture au [café des astres](HOROSCOPE.md) | Un seul, facultatif ; aucune date de naissance |
 | MP | Ouverts, sur demande, fermés | Un seul, facultatif |
 | Entraide | Coup de main | Ajouter ou retirer |
 | Région | 15 repères larges, dont outre-mer et autre coin du monde | Un seul, facultatif |
@@ -30,6 +30,32 @@ attribuée à une personne pendant l'installation. Un rôle de MP exprime une
 préférence : il ne bloque pas techniquement les messages. Les rôles de
 notification permettent les mentions du staff ; ils ne créent pas à eux seuls
 un envoi automatique de notifications.
+
+## Les coins du Comptoir
+
+Dans l'installation communautaire, les dix rôles de centres d'intérêt ouvrent
+chacun un salon sous **🛋️ LES COINS DU COMPTOIR** : lecture, jeux vidéo, jeux de
+société, films et séries, discussions musicales, cuisine, atelier créatif,
+animaux, sport et tech. Les discussions musicales et le lecteur du Juke-box
+gardent deux usages distincts.
+
+Sans le rôle correspondant, le salon est masqué. Choisir le rôle le fait apparaître ;
+le retirer le masque de nouveau. Le staff conserve un accès à ces espaces.
+Les rôles de pronoms, signe, région, rythme et MP restent des informations de profil.
+
+La configuration locale `role_channels` associe les identifiants de rôles aux
+salons du même serveur. Les menus publics indiquent le salon associé et la
+confirmation privée donne les liens des salons choisis. Aucun rôle n'est attribué
+automatiquement par cette installation et les permissions globales des rôles
+restent à zéro.
+
+L'accueil reste obligatoire pour choisir des rôles. Le contrôle est renouvelé
+après le verrou partagé avec l'accueil, pour éviter qu'une ancienne sélection
+ne rétablisse l'accès pendant une remise en attente. Moka retire les rôles liés
+à des salons lors d'un refus ou d'une remise en attente ; les rubriques sans accès
+supplémentaire sont conservées. La maintenance reprend ce retrait si Discord échoue.
+Il n'y a pas de suppression des messages lorsqu'un rôle est retiré, ni de filtre
+d'historique selon la date de choix du rôle.
 
 Pour une rubrique à choix unique, **Aucun choix** retire le rôle directement
 à l'intérieur de la liste, sans bouton supplémentaire. **Tout retirer** reste
@@ -45,7 +71,7 @@ staff, les paliers XP et le rôle de pause sont préservés.
 
 Le serveur doit être autorisé dans la configuration. Moka doit pouvoir gérer
 les rôles et être placé au-dessus des rôles de préférences. Le staff disposant
-de Gérer le serveur utilise :
+d'un rôle de gestion de Moka ou de Gérer le serveur utilise :
 
 ```text
 /roles installer
@@ -75,5 +101,6 @@ retiré du catalogue. Les demandes concurrentes d'un membre partagent un verrou.
 
 Les rôles privilégiés, gérés par une intégration ou placés trop haut sont refusés.
 Les rôles connus du staff des tickets, de progression, de pause et d'accès photo,
-ainsi que Le Barista, sont exclus du choix libre. Aucun rôle de préférence ne
-donne de permission supplémentaire dans le catalogue fourni.
+ainsi que Le Barista, sont exclus du choix libre. Les rôles de préférence n'ont
+aucune permission globale ; seuls ceux liés explicitement à un salon ouvrent
+cet espace, conformément à la configuration des Coins du Comptoir.

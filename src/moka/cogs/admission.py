@@ -5,11 +5,13 @@ import logging
 import re
 import unicodedata
 import weakref
+from datetime import UTC, datetime, timedelta
 
 import discord
 from discord import app_commands
 from discord.ext import commands
 
+from moka.admission_closure import close_approved
 from moka.admission_discord import AdmissionView, entry_overwrites, reading_status, recruiter
 from moka.base import DomainError
 from moka.discord_ui import card
@@ -78,8 +80,16 @@ class AdmissionCog(commands.Cog):
         desired, obsolete = (
             (approved, waiting) if row["status"] == "approved" else (waiting, approved)
         )
-        if obsolete in member.roles:
-            await member.remove_roles(obsolete, reason="Moka : accès au Comptoir")
+        remove = [obsolete] if obsolete in member.roles else []
+        if row["status"] != "approved":
+            linked = self.service.get_setting(guild.id, "role_channels", {})
+            remove.extend(
+                role
+                for role in member.roles
+                if str(role.id) in linked and role not in remove and role != desired
+            )
+        if remove:
+            await member.remove_roles(*remove, reason="Moka : accès au Comptoir")
         if desired not in member.roles:
             await member.add_roles(desired, reason="Moka : accueil au Comptoir")
         room = guild.get_channel(row["channel"] or 0)
@@ -100,6 +110,101 @@ class AdmissionCog(commands.Cog):
                 reason="Moka : confidentialité du vocal d'accueil",
             )
         await self.refresh(guild, member.id)
+        await self.notify_reading(guild, member.id)
+        await close_approved(self, guild, member.id)
+
+    async def notify_reading(self, guild, user, *, include_closed=False, ping=True):
+        """Appelé sous le verrou du candidat ; reçu durable et reprise après envoi."""
+        row = self.service.admission(guild.id, user)
+        if (
+            not row
+            or row["read_at"] is None
+            or not row["channel"]
+            or (row["status"] != "pending" and not include_closed)
+        ):
+            return False
+        key = f"admission:reading_notice:{user}"
+        receipt = self.service.get_setting(guild.id, key, {})
+        if receipt.get("read_at") == row["read_at"] and receipt.get("channel") == row["channel"]:
+            return False
+        try:
+            channel = guild.get_channel(row["channel"])
+            if not isinstance(channel, discord.TextChannel):
+                raise DomainError("Le salon privé de cet accueil est introuvable.")
+            candidate = await guild.fetch_member(user)
+            expected = entry_overwrites(
+                guild, self.service, candidate=candidate, writable=row["status"] == "pending"
+            )
+            if channel.overwrites != expected:
+                raise DomainError(
+                    "Les permissions privées de cet accueil doivent être resynchronisées."
+                )
+            stamp = datetime.fromtimestamp(row["read_at"], UTC)
+            stamp = stamp.replace(microsecond=stamp.microsecond // 1000 * 1000)
+            # Retrouver un envoi Discord réussi avant une interruption de l'accusé SQLite.
+            async for message in channel.history(limit=None, after=stamp - timedelta(seconds=1)):
+                if message.author.id == guild.me.id and any(
+                    embed.title == "✅ Charte confirmée" and embed.timestamp == stamp
+                    for embed in message.embeds
+                ):
+                    self.service.set_setting(
+                        guild.id,
+                        key,
+                        {"read_at": row["read_at"], "channel": channel.id, "message": message.id},
+                    )
+                    return False
+            members = [member async for member in guild.fetch_members(limit=None)]
+            staff = (
+                sorted(
+                    (
+                        member
+                        for member in members
+                        if not member.bot
+                        and member.id != user
+                        and recruiter(self.service, member)
+                        and channel.permissions_for(member).view_channel
+                    ),
+                    key=lambda member: member.id,
+                )
+                if ping
+                else []
+            )
+            state = (
+                "L'équipe peut poursuivre l'entretien. **L'accès au Comptoir attend toujours sa validation humaine.**"
+                if row["status"] == "pending"
+                else "**Cet accueil a déjà été validé.**"
+                if row["status"] == "approved"
+                else "Cet accueil est déjà clôturé."
+            )
+            embed = card(
+                "✅ Charte confirmée",
+                f"<@{user}> a confirmé la lecture de la charte avec le mot attendu.\n\n" + state,
+            )
+            embed.timestamp = stamp
+            if row["message"]:
+                embed.url = f"https://discord.com/channels/{guild.id}/{channel.id}/{row['message']}"
+            embed.set_footer(text="Moka · Le mot de lecture n'est pas affiché")
+            message = await channel.send(
+                content="🔔 " + " ".join(member.mention for member in staff) if staff else None,
+                embed=embed,
+                allowed_mentions=discord.AllowedMentions(
+                    everyone=False, roles=False, users=staff, replied_user=False
+                ),
+            )
+            self.service.set_setting(
+                guild.id,
+                key,
+                {"read_at": row["read_at"], "channel": channel.id, "message": message.id},
+            )
+            return True
+        except (discord.HTTPException, DomainError):
+            log.warning(
+                "Notification de lecture à reprendre pour l'accueil %s/%s",
+                guild.id,
+                user,
+                exc_info=True,
+            )
+            return False
 
     async def ensure_member(self, member):
         if member.bot or not self.service.admission_enabled(member.guild.id):
@@ -241,13 +346,24 @@ class AdmissionCog(commands.Cog):
         ):
             return
         self.last_reconcile[guild.id] = now
+        reconciled = set()
         for member in guild.members:
             if member.bot:
                 continue
             try:
                 await self.ensure_member(member)
+                reconciled.add(member.id)
             except (DomainError, discord.HTTPException):
                 log.exception("Accueil à reprendre ; nouvel essai dans une minute")
+        # Le délai continue aussi pour les personnes ayant quitté le serveur.
+        for row in self.service.approved_interviews(guild.id):
+            if row["user"] in reconciled:
+                continue  # sync a déjà repris cette clôture sous le verrou du candidat.
+            try:
+                async with self.lock(guild.id, row["user"]):
+                    await close_approved(self, guild, row["user"])
+            except (DomainError, discord.HTTPException):
+                log.exception("Clôture d'accueil à reprendre ; nouvel essai dans une minute")
 
     @accueil.command(name="etat", description="Voir l'état du premier café de ce salon (staff)")
     async def status(self, interaction: discord.Interaction):

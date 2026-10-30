@@ -32,12 +32,15 @@ jobs:
       - run: docker build -t moka:validation .
       - name: Vérifier le conteneur sans token ni connexion Discord
         run: |
-          docker run --rm --read-only --tmpfs /tmp:size=64m,mode=1777 \
+          docker run --rm --init --cpus=2 --memory=1g --pids-limit=256 \
+            --read-only --tmpfs /tmp:size=64m,mode=1777 \
+            --cap-drop ALL --security-opt no-new-privileges \
             --entrypoint sh moka:validation -ec '
               test "$(id -u)" = 10001
               deno --version
               ffmpeg -version
               python -m yt_dlp --version
+              python -c "from moka.cogs.horoscope import ART; from PIL import Image; Image.open(ART).verify()"
               moka --config /app/config.toml check
               moka demo
             '

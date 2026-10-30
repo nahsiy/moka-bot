@@ -4,11 +4,12 @@ build-backend = "hatchling.build"
 
 [project]
 name = "moka-community-bot"
-version = "0.3.0"
+version = "0.4.0"
 description = "Un compagnon Discord modulaire pour les communautés francophones."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "aiohttp>=3.14,<4",
     "discord-py[voice]>=2.7.1,<3",
     "pillow>=11,<13",
     "yt-dlp[default]>=2026.10.14",

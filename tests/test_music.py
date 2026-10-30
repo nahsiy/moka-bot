@@ -91,6 +91,12 @@ async def test_music_controls_recheck_channel_voice_and_staff(service):
     with pytest.raises(DomainError, match="staff"):
         await cog.authorize(interaction, listening=False, staff_only=True)
     await cog.authorize(interaction, listening=False)
+    service.set_setting(1, "moka:admin_roles", [500])
+    member.roles = [SimpleNamespace(id=500)]
+    await cog.authorize(interaction, listening=False, staff_only=True)
+    member.roles = []
+    with pytest.raises(DomainError, match="staff"):
+        await cog.authorize(interaction, listening=False, staff_only=True)
 
 
 def test_music_channel_overwrites_keep_admission_and_disable_chat_and_mics(service):

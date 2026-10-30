@@ -46,6 +46,7 @@ CHANNELS = frozenset(
         "trombi_review",
         "music_text",
         "music_voice",
+        "horoscope",
     }
 )
 ROLES = frozenset({"counting_failure", "counting_cheat", "trombi_preaccess", "trombi_access"})

@@ -168,6 +168,7 @@ class Community(BaseService):
         tables = (
             "accounts",
             "admissions",
+            "admission_closures",
             "presence",
             "counting_validations",
             "inventory",

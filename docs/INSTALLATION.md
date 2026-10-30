@@ -66,7 +66,7 @@ les logs sans les diffuser tels quels.
 
 ## Configuration dans Discord
 
-Avec un compte disposant de Gérer le serveur :
+Avec le propriétaire, un rôle de gestion de Moka configuré ou la permission Gérer le serveur :
 
 ```text
 /config salon usage:counting salon:#counting
@@ -77,6 +77,10 @@ Avec un compte disposant de Gérer le serveur :
 /config comptage amende:1000
 /config suite_mots mode:free
 ```
+
+Le journal affiche les personnes avec leur pseudo Discord, via des mentions
+sans notification. Les identifiants techniques restent réservés aux opérations
+internes et aux motifs du journal d'audit natif de Discord.
 
 Ces noms sont des exemples à créer sur le serveur de test. Ne pas activer deux
 bots de counting ou d'XP dans le même salon pendant un essai de transition.
@@ -116,7 +120,7 @@ rôles peuvent y soumettre une image. Pas d'accès automatique par simple messag
 Le Juke-box demande FFmpeg et Deno 2.3 minimum dans PATH, en plus des dépendances
 Python voix déjà verrouillées. Le conteneur les embarque. En installation Python,
 installer ces deux exécutables depuis leurs sources officielles, puis ouvrir
-`/config jukebox` avec la permission Gérer le serveur. Aucun cookie personnel.
+`/config jukebox` avec un rôle de gestion de Moka ou la permission Gérer le serveur. Aucun cookie personnel.
 Voir [le fonctionnement et les limites](JUKEBOX.md).
 
 ## Nouveautés et mise à jour
@@ -128,7 +132,8 @@ embarquées ; aucun service IA ni clé supplémentaire n'est nécessaire.
 [comportement](AMBIANCE.md). Les commandes peuvent s'utiliser dans un salon de
 distractions, sans configuration d'identifiant supplémentaire.
 
-Pour passer de 0.2.0 à 0.3.0, suivre [les notes de version](RELEASE-0.3.0.md).
+Pour passer de 0.3.0 à 0.4.0, suivre [les notes de version](RELEASE-0.4.0.md).
+La mise à jour 0.2.0 → 0.3.0 reste dans [ses notes historiques](RELEASE-0.3.0.md).
 Les étapes de la mise à jour 0.1.0 → 0.2.0 restent dans [le changelog](../CHANGELOG.md).
 Sauvegarder la base et resynchroniser une fois les commandes dans les seuls
 serveurs autorisés. Les pauses actives gardent leur échéance.
@@ -150,3 +155,5 @@ Le build et l’exécution Linux ARM64 sont vérifiés localement, y compris Den
 FFmpeg, la démo et le rendu des cartes en lecture seule. Une source YouTube a été
 résolue et décodée dans le conteneur, sans connexion Discord. Le job CI complète
 la vérification hors ligne sur son runner ; voir [le périmètre exact](NETTOYAGE.md).
+
+Pour préparer une migration vers un hébergement permanent : [guide VPS](DEPLOIEMENT-VPS.md).

@@ -1,5 +1,25 @@
 # Historique des versions
 
+## 0.4.0 — 30 octobre 2026
+
+Le Comptoir s’organise : administration par rôles dédiés, annuaire de l’équipe,
+salons selon les intérêts, confirmations de charte et clôture privée des entretiens
+validés après sept jours. Nettoyage manuel avec aperçu et confirmation ; journal
+lisible sans notifications. Horoscope éditorial sourcé avec nouveau salon illustré.
+
+La revue regroupe l’ouverture des réglages, évite la double réconciliation des
+clôtures et isole les tâches de maintenance. Les anciens boutons et réglages
+restent compatibles. Le conteneur borne ses ressources et le guide VPS prépare
+une migration à instance unique, sans déploiement automatique.
+
+**Mise à jour :** sauvegarder, arrêter l’ancienne instance, synchroniser les
+dépendances, conserver les données et resynchroniser une fois les commandes.
+La nouvelle table de clôture est ajoutée sans effacer les comptes. Les entretiens
+déjà validés reçoivent leur annonce et sept jours complets avant suppression.
+
+[Notes détaillées](docs/RELEASE-0.4.0.md) · [Validation](docs/VALIDATION.md) ·
+[Revue du code](docs/NETTOYAGE-0.4.0.md)
+
 ## 0.3.0 — 30 octobre 2026
 
 Le Comptoir prend vie : accueil, personnalisation, outils du staff et musique partagée.

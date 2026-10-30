@@ -34,7 +34,32 @@ async def test_discord_tree_serializes_without_token_or_network(service):
         "hack",
     } <= names
     config = next(c for c in data if c["name"] == "config")
-    assert int(config["default_member_permissions"]) & discord.Permissions(manage_guild=True).value
+    # Les rôles Moka peuvent gérer le bot sans la permission Discord Gérer le serveur.
+    # Les contrôles au moment de l'action restent obligatoires.
+    assert config.get("default_member_permissions") is None
+
+
+@pytest.mark.parametrize("failed", range(6))
+async def test_one_failed_maintenance_job_does_not_skip_other_modules(service, failed):
+    jobs = [AsyncMock() for _ in range(6)]
+    jobs[failed].side_effect = DomainError("Module momentanément indisponible")
+    cogs = {
+        "AdmissionCog": SimpleNamespace(reconcile=jobs[0]),
+        "CommunityCog": SimpleNamespace(reconcile=jobs[1]),
+        "PresenceCog": SimpleNamespace(reconcile=jobs[4]),
+        "HoroscopeCog": SimpleNamespace(refresh_home=jobs[5]),
+    }
+    bot = SimpleNamespace(
+        service=service,
+        config=service.config,
+        guilds=[SimpleNamespace(id=1)],
+        get_cog=cogs.get,
+        reconcile_level_roles=jobs[2],
+        auto_goblin=jobs[3],
+    )
+    await MokaBot.maintenance.coro(bot)
+    for job in jobs:
+        job.assert_awaited_once_with(bot.guilds[0])
 
 
 async def test_persistent_buttons_survive_restart():
