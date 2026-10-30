@@ -67,6 +67,7 @@ manque, Moka l'indique ; aucun texte inventé ou ancien n'est présenté comme l
   Les personnes parties et les synchronisations échouées restent reprises.
 - L'échec d'un module de maintenance n'empêche plus les autres de s'exécuter.
 - Version du lecteur externe liée à celle du paquet, sans numéro recopié à maintenir.
+- Actions CI actualisées, références fixées par SHA et runner Ubuntu 24.04 explicite.
 - Compatibilités des anciens boutons et réglages conservées.
 
 ## Mettre à jour depuis 0.3.0

@@ -44,4 +44,8 @@ privées. Les essais de conteneur et les parcours Discord sont distingués dans
 Les alertes de dépréciation des dépendances restent visibles. Cette revue n'est
 pas une affirmation de performance chiffrée globale ni un audit de sécurité exhaustif.
 
+Les actions CI utilisent des versions maintenues sur Node 24, référencées par
+leur SHA vérifié, et un runner Ubuntu 24.04 explicite. Cela retire la dépendance
+aux anciennes actions Node 20 et au basculement implicite de `ubuntu-latest`.
+
 [Notes 0.4.0](RELEASE-0.4.0.md) · [Préparation VPS](DEPLOIEMENT-VPS.md)
